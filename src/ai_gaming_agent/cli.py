@@ -13,9 +13,12 @@ from ai_gaming_agent.config import Config
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
-    """Run the MCP server."""
-    from ai_gaming_agent.server import run_server
+    """Run the MCP server.
 
+    Supports two transport modes:
+    - stdio: Standard I/O transport for local use (e.g., Claude Desktop)
+    - http: HTTP/SSE transport for remote control over network
+    """
     config = Config.load(Path(args.config) if args.config else None)
 
     # Override with CLI args
@@ -26,10 +29,26 @@ def cmd_serve(args: argparse.Namespace) -> int:
     if args.host:
         config.server.host = args.host
 
-    print(f"Starting AI Gaming Agent MCP Server v{__version__}", file=sys.stderr)
-    print(f"Host: {config.server.host}:{config.server.port}", file=sys.stderr)
+    transport = args.transport
 
-    asyncio.run(run_server(config))
+    if transport == "stdio":
+        from ai_gaming_agent.server import run_server
+
+        print(f"Starting AI Gaming Agent MCP Server v{__version__} (stdio)", file=sys.stderr)
+        asyncio.run(run_server(config))
+    else:  # http
+        from ai_gaming_agent.http_server import run_http_server
+
+        print(f"Starting AI Gaming Agent MCP Server v{__version__} (HTTP/SSE)", file=sys.stderr)
+        print(f"Listening on http://{config.server.host}:{config.server.port}", file=sys.stderr)
+        print(f"MCP endpoint: http://{config.server.host}:{config.server.port}/mcp", file=sys.stderr)
+
+        if not config.server.password:
+            print("WARNING: No password configured. Authentication will fail.", file=sys.stderr)
+            print("Run 'gaming-agent init --password <password>' to set one.", file=sys.stderr)
+
+        asyncio.run(run_http_server(config))
+
     return 0
 
 
@@ -72,8 +91,15 @@ def main() -> int:
 
     # serve command
     serve_parser = subparsers.add_parser("serve", help="Run the MCP server")
-    serve_parser.add_argument("--host", type=str, help="Host to bind to")
-    serve_parser.add_argument("--port", type=int, help="Port to listen on")
+    serve_parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["stdio", "http"],
+        default="http",
+        help="Transport mode: 'stdio' for local use, 'http' for remote (default: http)",
+    )
+    serve_parser.add_argument("--host", type=str, help="Host to bind to (http mode)")
+    serve_parser.add_argument("--port", type=int, help="Port to listen on (http mode)")
     serve_parser.add_argument("--password", type=str, help="Authentication password")
     serve_parser.add_argument("--config", type=str, help="Path to config file")
     serve_parser.set_defaults(func=cmd_serve)
