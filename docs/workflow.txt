@@ -1,0 +1,162 @@
+AI GAMING AGENT - Workflow Guide
+==================================
+
+MASTER CLAUDE WORKFLOW
+----------------------
+
+Step 1: Initialize Connections
+  Master Claude connects to all configured MCP servers
+  Example connections:
+    - PC1 (192.168.1.10:8765) - Account: PlayerOne
+    - PC2 (192.168.1.11:8765) - Account: PlayerTwo
+    - PC3 (192.168.1.12:8765) - Account: PlayerThree
+
+Step 2: Check Current State (Parallel)
+  For each PC, Claude requests:
+    - Screenshot of current game screen
+    - Optional: analyze_screen for quick status
+
+  Results might show:
+    - PC1: Level 15, doing quest "Dragon Slayer"
+    - PC2: Level 8, idle in town
+    - PC3: Level 22, in combat
+
+Step 3: Generate Instructions
+  Claude analyzes all states and decides actions:
+    - PC1: Continue quest, navigate to next objective
+    - PC2: Accept quest from NPC, start leveling
+    - PC3: Execute combat rotation
+
+Step 4: Execute Actions
+  Claude sends tool calls to each PC:
+    - PC1: click, move_to, click sequence
+    - PC2: click on NPC, type dialog option, press enter
+    - PC3: hotkey sequence for skills
+
+Step 5: Verify and Loop
+  After actions complete:
+    - Take new screenshots
+    - Check if actions succeeded
+    - If failed: retry with different approach
+    - If succeeded: continue to next action
+
+Step 6: Report Progress
+  Periodically generate status reports:
+    - Levels gained per account
+    - Quests completed
+    - Resources collected
+    - Time elapsed
+
+
+SINGLE PC ACTION SEQUENCE
+-------------------------
+
+  User Request: "Level up the account on PC1"
+
+  Claude Actions:
+    1. Call screenshot on PC1
+       -> Receives game screen image
+
+    2. Analyze screenshot
+       -> Identifies: Menu open, "Play" button visible
+
+    3. Call click on Play button coordinates
+       -> Returns success
+
+    4. Wait for game to load (2 seconds)
+
+    5. Call screenshot again
+       -> Now shows in-game view
+
+    6. Analyze new screenshot
+       -> Character at level 15, enemy visible
+
+    7. Decide: Attack enemy for XP
+
+    8. Call click on enemy position
+       -> Targets enemy
+
+    9. Call press_key for attack skill
+       -> Executes attack
+
+   10. Loop steps 5-9 until level up detected
+
+   11. Report: "Gained 1 level on PC1, now level 16"
+
+
+PARALLEL OPERATION
+------------------
+Claude can manage multiple PCs simultaneously:
+
+  1. Send screenshot requests to all PCs in parallel
+  2. Analyze all screenshots
+  3. Generate action plan for each PC
+  4. Execute actions on all PCs (can be parallel)
+  5. Verify results on all PCs
+  6. Repeat
+
+
+ERROR HANDLING
+--------------
+When actions fail:
+
+  1. Take new screenshot to see current state
+  2. Identify what went wrong
+  3. Try alternative approach
+  4. If repeated failures: pause and report to user
+
+Common recovery strategies:
+  - Click slightly different coordinates
+  - Wait longer between actions
+  - Use keyboard instead of mouse
+  - Restart from known good state
+
+
+PROGRESS TRACKING
+-----------------
+Claude can track metrics over time:
+
+  - Starting level vs current level
+  - Quests started vs completed
+  - Gold/currency earned
+  - Items collected
+  - Time spent per level
+  - Actions per minute
+
+
+EXAMPLE SESSION
+---------------
+
+User: "Level up accounts on PC1 and PC2 to level 20"
+
+Claude Response:
+  "Checking current status of both PCs...
+
+   PC1 (Game X): Level 12, in starter zone
+   PC2 (Game X): Level 7, at login screen
+
+   PC2 needs to log in first. Handling that now...
+   [Executes login sequence on PC2]
+
+   PC1 - Moving to better XP zone...
+   [Navigates PC1 to quest area]
+
+   Continuing to monitor. Will report progress every 10 minutes."
+
+[10 minutes later]
+
+  "Progress Update:
+   - PC1: Level 12 -> 14 (+2 levels), completed 2 quests
+   - PC2: Level 7 -> 11 (+4 levels), finished tutorial
+
+   Continuing toward level 20 goal..."
+
+
+STOPPING AUTOMATION
+-------------------
+To pause or stop:
+
+  - User can request Claude to pause
+  - Claude will complete current action then wait
+  - Can resume from paused state
+  - Emergency: directly stop MCP server on gaming PC

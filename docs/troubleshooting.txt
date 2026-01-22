@@ -1,0 +1,154 @@
+AI GAMING AGENT - Troubleshooting Guide
+=========================================
+
+COMMON ISSUES AND SOLUTIONS
+---------------------------
+
+Connection Refused
+  Symptom: Cannot connect to MCP server
+  Causes:
+    - Server not running
+    - Firewall blocking port
+    - Wrong IP address or port
+  Solutions:
+    - Verify server is running
+    - Check firewall rules for port 8765
+    - Confirm correct IP address
+    - Test with health endpoint
+
+Unauthorized (401 Error)
+  Symptom: Connection rejected with 401
+  Causes:
+    - Wrong password
+    - Missing Authorization header
+    - Password mismatch between client and server
+  Solutions:
+    - Verify password in config matches Claude Desktop config
+    - Check Authorization header format (Bearer <password>)
+    - Regenerate password and update both configs
+
+Black Screenshots
+  Symptom: Screenshots return black image
+  Causes:
+    - Insufficient permissions
+    - Hardware acceleration issues
+    - Game running in exclusive fullscreen
+  Solutions:
+    - Run server with administrator/root privileges
+    - Disable hardware acceleration in game
+    - Switch game to windowed or borderless windowed mode
+
+Mouse Not Moving
+  Symptom: Click/move commands succeed but no mouse movement
+  Causes:
+    - Game capturing mouse input
+    - Permission issues
+    - Wrong coordinate system
+  Solutions:
+    - Disable game's mouse lock feature
+    - Run with elevated permissions
+    - Check if game uses relative vs absolute coordinates
+
+Slow Response
+  Symptom: Actions take long time to execute
+  Causes:
+    - Large screenshot uploads
+    - Network latency
+    - Server overload
+  Solutions:
+    - Reduce screenshot quality/resolution
+    - Use local VLM for analysis
+    - Check network connection speed
+    - Reduce action frequency
+
+Port Already In Use
+  Symptom: Server fails to start with port error
+  Causes:
+    - Another instance running
+    - Different application using port
+  Solutions:
+    - Kill existing process on port
+    - Change to different port in config
+    - Windows: netstat -ano | findstr 8765
+    - Linux: lsof -i :8765
+
+
+TESTING CONNECTIVITY
+--------------------
+
+Basic health check:
+  curl http://<IP>:8765/health
+
+Authenticated test:
+  curl -H "Authorization: Bearer <password>" http://<IP>:8765/mcp
+
+From Claude Desktop:
+  Try calling screenshot tool - if it returns an image, connection works
+
+
+VLM ISSUES
+----------
+
+VLM Not Responding
+  - Check Ollama is running (ollama list)
+  - Verify model is downloaded
+  - Check VRAM availability
+  - Review VLM endpoint in config
+
+Slow VLM Analysis
+  - Use smaller model (2B instead of 4B)
+  - Reduce image resolution
+  - Check GPU utilization
+  - Consider upgrading GPU
+
+
+LOG FILE LOCATIONS
+------------------
+  Server log:  ~/.gaming-agent/logs/server.log
+  Action log:  ~/.gaming-agent/logs/actions.log
+  Error log:   ~/.gaming-agent/logs/errors.log
+
+Enable debug logging:
+  Set GAMING_AGENT_DEBUG=1 environment variable
+
+
+PLATFORM-SPECIFIC ISSUES
+------------------------
+
+Windows:
+  - UAC may block automation - run as administrator
+  - Some games need compatibility mode
+  - Windows Defender may quarantine scripts
+
+Linux:
+  - X11 required (Wayland has limited support)
+  - xdotool may be needed as fallback
+  - Check DISPLAY environment variable
+
+macOS:
+  - Accessibility permissions required
+  - System Preferences > Security > Accessibility
+  - Some games incompatible with automation
+
+
+PERFORMANCE OPTIMIZATION
+------------------------
+If experiencing lag or delays:
+
+  1. Enable local VLM to reduce API calls
+  2. Lower screenshot resolution
+  3. Increase action delays slightly
+  4. Use wired network connection
+  5. Close unnecessary applications
+  6. Check CPU/RAM usage with get_system_info
+
+
+GETTING HELP
+------------
+If issues persist:
+
+  1. Check log files for specific errors
+  2. Verify all configuration settings
+  3. Test each component independently
+  4. Document exact error messages
+  5. Note steps to reproduce issue

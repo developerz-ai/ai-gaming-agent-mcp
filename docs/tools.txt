@@ -1,0 +1,170 @@
+AI GAMING AGENT - MCP Tools Reference
+=======================================
+
+SCREEN TOOLS
+------------
+
+screenshot
+  Description: Capture current screen
+  Parameters:
+    monitor (optional) - Monitor index for multi-monitor setups
+  Returns: Base64 encoded PNG image
+
+get_screen_size
+  Description: Get screen dimensions
+  Parameters: None
+  Returns: Width and height in pixels
+
+analyze_screen
+  Description: Use local VLM to analyze screen content
+  Parameters:
+    prompt - Question about the screen content
+  Returns: VLM response text
+
+
+MOUSE TOOLS
+-----------
+
+click
+  Description: Click at screen coordinates
+  Parameters:
+    x - X coordinate (pixels from left)
+    y - Y coordinate (pixels from top)
+    button (optional) - left, right, or middle
+  Returns: Success or failure status
+
+double_click
+  Description: Double-click at coordinates
+  Parameters:
+    x - X coordinate
+    y - Y coordinate
+  Returns: Success or failure status
+
+move_to
+  Description: Move mouse cursor
+  Parameters:
+    x - Target X coordinate
+    y - Target Y coordinate
+    duration (optional) - Movement time in seconds
+  Returns: Success or failure status
+
+drag_to
+  Description: Drag from current position to target
+  Parameters:
+    x - Target X coordinate
+    y - Target Y coordinate
+    duration (optional) - Drag duration in seconds
+  Returns: Success or failure status
+
+scroll
+  Description: Scroll mouse wheel
+  Parameters:
+    clicks - Number of scroll ticks (positive=up, negative=down)
+    x (optional) - Scroll at specific X position
+    y (optional) - Scroll at specific Y position
+  Returns: Success or failure status
+
+get_mouse_position
+  Description: Get current mouse cursor location
+  Parameters: None
+  Returns: X and Y coordinates
+
+
+KEYBOARD TOOLS
+--------------
+
+type_text
+  Description: Type a string of text
+  Parameters:
+    text - Text to type
+    interval (optional) - Delay between keystrokes
+  Returns: Success or failure status
+
+press_key
+  Description: Press a single keyboard key
+  Parameters:
+    key - Key name (e.g., enter, escape, tab, f1)
+    modifiers (optional) - List of modifier keys (ctrl, alt, shift)
+  Returns: Success or failure status
+
+hotkey
+  Description: Press a key combination
+  Parameters:
+    keys - List of keys to press together (e.g., ctrl, c)
+  Returns: Success or failure status
+
+
+FILE TOOLS
+----------
+
+read_file
+  Description: Read file contents
+  Parameters:
+    path - File path (must be in allowed directories)
+  Returns: File contents (text or base64 for binary)
+
+write_file
+  Description: Write content to file
+  Parameters:
+    path - File path
+    content - Content to write
+    binary (optional) - Treat content as base64 binary
+  Returns: Success or failure status
+
+list_files
+  Description: List directory contents
+  Parameters:
+    path - Directory path
+  Returns: List of file and folder names
+
+upload_file
+  Description: Upload file to gaming PC
+  Parameters:
+    path - Destination path
+    content - File content (text or base64)
+    binary (optional) - Content is base64 binary
+  Returns: Success or failure status
+
+download_file
+  Description: Download file from gaming PC
+  Parameters:
+    path - File path to download
+  Returns: Base64 encoded file content
+
+
+SYSTEM TOOLS
+------------
+
+execute_command
+  Description: Run shell/terminal command
+  Parameters:
+    command - Command to execute
+    timeout (optional) - Max execution time in seconds
+  Returns: stdout, stderr, and exit code
+
+get_system_info
+  Description: Get system resource usage
+  Parameters: None
+  Returns: CPU, RAM, and GPU usage statistics
+
+list_windows
+  Description: List all open windows
+  Parameters: None
+  Returns: Window titles and handles
+
+focus_window
+  Description: Bring window to foreground
+  Parameters:
+    title - Window title (partial match)
+    OR handle - Window handle ID
+  Returns: Success or failure status
+
+
+EXPOSED RESOURCES
+-----------------
+Resources can be accessed by URI:
+
+  screen://current   - Live screenshot (refreshes each access)
+  file:///{path}     - File system access
+  system://info      - System information
+  game://status      - Custom game state (if implemented)

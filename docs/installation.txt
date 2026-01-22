@@ -1,0 +1,114 @@
+AI GAMING AGENT - Installation Guide
+======================================
+
+QUICK INSTALL
+-------------
+Windows (PowerShell as Administrator):
+  irm https://your-domain.com/install.ps1 | iex
+
+Linux/Mac (Terminal):
+  curl -fsSL https://your-domain.com/install.sh | bash
+
+
+SYSTEM REQUIREMENTS
+-------------------
+  - Python 3.10 or higher
+  - 4GB RAM minimum (8GB recommended)
+  - Network connectivity to Master Claude
+  - Administrator/root privileges for input automation
+
+For Local VLM (optional):
+  - NVIDIA GPU with 4-8GB VRAM
+  - CUDA drivers installed
+
+
+INSTALLATION STEPS
+------------------
+The installer performs these steps automatically:
+
+  1. Verify Python 3.10+ is installed
+     - Downloads Python if missing
+
+  2. Create virtual environment
+     - Location: ~/.gaming-agent/venv/
+
+  3. Install Python dependencies
+     - pyautogui, mcp, pillow, fastapi
+     - uvicorn, screeninfo, psutil
+     - ollama (optional, for local VLM)
+
+  4. Download MCP server script
+     - Location: ~/.gaming-agent/server.py
+
+  5. Prompt for configuration
+     - Password/API Key
+     - Port (default: 8765)
+     - Enable local VLM option
+     - VLM model selection
+
+  6. Create system service
+     - Windows: Scheduled task (runs at startup)
+     - Linux: systemd service
+
+  7. Configure firewall
+     - Opens configured port
+
+  8. Generate connection config
+     - Outputs MCP config for Claude Desktop
+
+  9. Start the server
+
+
+MANUAL INSTALLATION
+-------------------
+If the quick installer fails, follow these steps:
+
+  1. Install Python 3.10+
+
+  2. Create project directory
+     mkdir ~/.gaming-agent
+     cd ~/.gaming-agent
+
+  3. Create virtual environment
+     python -m venv venv
+
+  4. Activate environment
+     Windows: venv\Scripts\activate
+     Linux/Mac: source venv/bin/activate
+
+  5. Install dependencies
+     pip install pyautogui mcp pillow fastapi uvicorn screeninfo psutil
+
+  6. Download server script from repository
+
+  7. Create config.json (see configuration.txt)
+
+  8. Run server
+     python server.py
+
+
+POST-INSTALLATION
+-----------------
+After installation:
+
+  1. Note the generated password
+  2. Copy the MCP config JSON for Claude Desktop
+  3. Verify server is running (check port 8765)
+  4. Test connection from Claude Desktop
+
+
+UNINSTALLATION
+--------------
+Windows:
+  gaming-agent uninstall
+
+Linux:
+  systemctl stop gaming-agent
+  systemctl disable gaming-agent
+  rm -rf ~/.gaming-agent
+
+
+UPDATING
+--------
+Run the installer again or use:
+  gaming-agent update

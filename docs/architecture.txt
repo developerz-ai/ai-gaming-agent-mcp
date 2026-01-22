@@ -1,0 +1,92 @@
+AI GAMING AGENT - System Architecture
+======================================
+
+ARCHITECTURE DIAGRAM
+--------------------
+
+                    +---------------------------+
+                    |      MASTER CLAUDE        |
+                    |  (Claude Desktop / API)   |
+                    |                           |
+                    |  - Strategy & planning    |
+                    |  - Decision making        |
+                    |  - Progress monitoring    |
+                    +-----------+---------------+
+                                |
+                                | MCP Protocol (JSON-RPC over HTTP/SSE)
+                                |
+         +----------------------+----------------------+
+         |                      |                      |
+         v                      v                      v
+    +---------+            +---------+            +---------+
+    |  PC #1  |            |  PC #2  |            |  PC #N  |
+    | Gaming  |            | Gaming  |            | Gaming  |
+    |         |            |         |            |         |
+    | MCP     |            | MCP     |            | MCP     |
+    | Server  |            | Server  |            | Server  |
+    | :8765   |            | :8765   |            | :8765   |
+    |         |            |         |            |         |
+    | Local   |            | Local   |            | Local   |
+    | VLM     |            | VLM     |            | VLM     |
+    | (opt)   |            | (opt)   |            | (opt)   |
+    |         |            |         |            |         |
+    | PyAuto  |            | PyAuto  |            | PyAuto  |
+    | GUI     |            | GUI     |            | GUI     |
+    |         |            |         |            |         |
+    | [Game]  |            | [Game]  |            | [Game]  |
+    +---------+            +---------+            +---------+
+
+
+COMMUNICATION FLOW
+------------------
+
+  1. Master Claude sends tool call request
+  2. MCP Server receives and validates request
+  3. Server executes action (screenshot, click, etc)
+  4. Server returns result to Claude
+  5. Claude analyzes result and plans next action
+
+
+MCP PROTOCOL OVERVIEW
+---------------------
+MCP (Model Context Protocol) is an open protocol by Anthropic that
+standardizes how AI applications connect to external tools. Think of
+it as a universal interface for AI tool integration.
+
+Key Components:
+  Host      - The AI application coordinating everything
+  Client    - Manages connection to one MCP Server
+  Server    - Exposes tools, resources, and prompts
+  Transport - Message delivery: stdio (local) or HTTP/SSE (remote)
+
+
+ARCHITECTURE OPTIONS
+--------------------
+
+Option A: Claude Does All Vision (Simplest)
+  - Master Claude analyzes all screenshots
+  - Gaming PCs are simple executors
+  - No GPU needed on gaming PCs
+  - Higher latency due to image upload
+  - Best intelligence (Claude is smarter)
+
+Option B: Hybrid (Local VLM for Speed)
+  - Master Claude handles high-level decisions
+  - Local VLM handles fast visual processing
+  - Lower API costs
+  - Requires GPU on gaming PCs
+  - Good balance of speed and intelligence
+
+Option C: Full Local (Maximum Privacy)
+  - Local orchestrator (e.g., Qwen3-72B)
+  - Local VLMs on gaming PCs
+  - No API costs
+  - Complete privacy
+  - Requires powerful hardware
+
+
+RECOMMENDED APPROACH
+--------------------
+Start with Option A for simplicity. Move to Option B if you need
+faster response times or want to reduce API costs. Option C is for
+users who require complete offline operation.

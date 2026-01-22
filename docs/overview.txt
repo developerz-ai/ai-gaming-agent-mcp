@@ -1,0 +1,72 @@
+AI GAMING AGENT - Project Overview
+===================================
+
+Project Name: ai-gaming-agent
+
+EXECUTIVE SUMMARY
+-----------------
+AI Gaming Agent is a distributed automation system where a Master Claude
+orchestrator controls multiple remote gaming PCs through MCP (Model Context
+Protocol) servers. Each PC runs a local vision model and PyAutoGUI to
+execute game actions autonomously.
+
+The system enables simultaneous game account leveling across different
+machines with intelligent decision-making and progress monitoring.
+
+
+PRIMARY USE CASE
+----------------
+Automated game leveling across multiple accounts and machines:
+
+  - Master Claude connects to multiple gaming PCs
+  - Each PC runs an MCP server exposing control tools
+  - Claude analyzes game screens and decides actions
+  - Actions execute via PyAutoGUI on each PC
+  - Progress is monitored and reported automatically
+
+
+KEY CAPABILITIES
+----------------
+  1. Multi-PC orchestration from single Claude instance
+  2. Real-time screenshot capture and analysis
+  3. Mouse and keyboard automation
+  4. File system access for game data
+  5. Optional local vision models for faster processing
+  6. Progress tracking and reporting
+
+
+SYSTEM COMPONENTS
+-----------------
+  Master Claude
+    - High-level strategy and planning
+    - Decides what actions to take
+    - Monitors progress across all PCs
+    - Handles complex decision-making
+
+  MCP Server (per gaming PC)
+    - Exposes tools via MCP protocol
+    - Handles screenshot capture
+    - Executes mouse/keyboard actions
+    - Optional local VLM for fast analysis
+
+  PyAutoGUI
+    - Low-level input automation
+    - Cross-platform mouse/keyboard control
+
+  Local VLM (optional)
+    - Fast visual processing
+    - Reduces API costs
+    - Works offline
+
+
+TARGET PLATFORMS
+----------------
+  - Windows 10/11
+  - Linux (X11)
+  - macOS
+
+
+PROJECT STATUS
+--------------
+Version: 1.0
+Last Updated: January 2026

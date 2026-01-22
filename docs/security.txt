@@ -1,0 +1,136 @@
+AI GAMING AGENT - Security Guide
+==================================
+
+SECURITY LAYERS
+---------------
+The system implements multiple security measures:
+
+  1. Password/Token Authentication
+     - Required for all connections
+     - Validated on every request
+
+  2. Path Restrictions
+     - File access limited to allowed directories
+     - Prevents access to system files
+
+  3. Command Blocklist
+     - Dangerous commands are blocked
+     - Prevents system damage
+
+  4. Rate Limiting
+     - Maximum requests per minute
+     - Prevents abuse
+
+  5. Audit Logging
+     - All actions logged with timestamps
+     - Enables review and forensics
+
+  6. TLS/HTTPS (Optional)
+     - Encrypts all traffic
+     - Recommended for production
+
+
+AUTHENTICATION FLOW
+-------------------
+  1. Client sends HTTP request with Authorization header
+  2. Header format: "Bearer <password>"
+  3. Server validates password against config
+  4. If valid: establish SSE connection
+  5. If invalid: return 401 Unauthorized
+
+
+BEST PRACTICES - DO
+-------------------
+  - Use strong, unique passwords (16+ characters)
+  - Use different passwords for each PC
+  - Limit file access to game directories only
+  - Use VPN when accessing over internet
+  - Enable TLS/HTTPS for production
+  - Rotate passwords regularly
+  - Review audit logs periodically
+  - Keep software updated
+
+
+BEST PRACTICES - DON'T
+----------------------
+  - Expose port directly to internet without VPN
+  - Use simple or default passwords
+  - Allow unrestricted command execution
+  - Give access to system directories
+  - Run server as root/admin unless required
+  - Share passwords across multiple systems
+  - Ignore authentication failures in logs
+
+
+NETWORK SECURITY
+----------------
+
+Local Network Only (Recommended for beginners):
+  - Bind to local IP only
+  - Use network firewall
+  - No internet exposure
+
+VPN Access (Recommended for remote):
+  - Use WireGuard, OpenVPN, or Tailscale
+  - Gaming PCs only accessible via VPN
+  - Full encryption of traffic
+
+Direct Internet (Not Recommended):
+  - Requires TLS/HTTPS
+  - Strong password essential
+  - Consider IP allowlisting
+  - Monitor for attacks
+
+
+COMMAND EXECUTION SAFETY
+------------------------
+The execute_command tool is powerful but dangerous.
+
+Recommended blocked commands:
+  - rm -rf, del /f (destructive deletion)
+  - format (disk formatting)
+  - shutdown, reboot (system control)
+  - chmod 777, icacls (permission changes)
+  - curl | bash (remote code execution)
+
+Set reasonable timeout limits (30 seconds default).
+
+
+FILE ACCESS SAFETY
+------------------
+Limit allowed_paths to:
+  - Game installation directory
+  - Game save/data directory
+  - Temporary screenshot folder
+
+Never allow:
+  - System directories (Windows, System32, /etc)
+  - User profile root
+  - Password/credential storage locations
+
+
+LOGGING AND MONITORING
+----------------------
+Log files are stored in ~/.gaming-agent/logs/
+
+  server.log  - Server events and connections
+  actions.log - All tool executions
+  errors.log  - Error events
+
+Review logs regularly for:
+  - Failed authentication attempts
+  - Unusual command patterns
+  - Unexpected file access
+  - High request rates
+
+
+INCIDENT RESPONSE
+-----------------
+If you suspect unauthorized access:
+
+  1. Stop the MCP server immediately
+  2. Change passwords
+  3. Review audit logs
+  4. Check for unauthorized file changes
+  5. Restart with new configuration
+  6. Consider additional security measures

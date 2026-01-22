@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-gaming-agent"
+version = "0.1.0"
+description = "MCP server for remote PC automation - enables AI agents to control gaming PCs"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "DeveloperZ AI" }
+]
+keywords = ["mcp", "automation", "gaming", "ai", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+    "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+    "mcp>=1.0.0",
+    "pyautogui>=0.9.54",
+    "pillow>=10.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "screeninfo>=0.8.1",
+    "psutil>=6.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+vlm = [
+    "ollama>=0.4.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[project.scripts]
+gaming-agent = "ai_gaming_agent.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/developerz-ai/ai-gaming-agent-mcp"
+Repository = "https://github.com/developerz-ai/ai-gaming-agent-mcp"
+Issues = "https://github.com/developerz-ai/ai-gaming-agent-mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_gaming_agent"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

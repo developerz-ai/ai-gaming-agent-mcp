@@ -1,0 +1,102 @@
+AI GAMING AGENT - Configuration Guide
+=======================================
+
+CONFIG FILE LOCATION
+--------------------
+  ~/.gaming-agent/config.json
+
+
+CONFIGURATION SECTIONS
+----------------------
+
+SERVER SETTINGS
+  host     - Bind address (default: 0.0.0.0 for all interfaces)
+  port     - Server port (default: 8765)
+  password - Authentication password (required)
+
+VLM SETTINGS (Optional)
+  enabled  - Enable local vision model (true/false)
+  provider - VLM provider (ollama recommended)
+  model    - Model name (e.g., qwen2.5-vl:3b)
+  endpoint - VLM API endpoint
+
+SECURITY SETTINGS
+  allowed_paths    - Directories the server can access
+  blocked_commands - Shell commands that are prohibited
+  max_command_timeout - Maximum execution time for commands
+
+FEATURE TOGGLES
+  screenshot         - Allow screenshot capture
+  file_access        - Allow file read/write
+  command_execution  - Allow shell commands
+  mouse_control      - Allow mouse automation
+  keyboard_control   - Allow keyboard automation
+
+
+CLAUDE DESKTOP CONFIGURATION
+----------------------------
+Add MCP servers to Claude Desktop config file:
+
+Windows:
+  %APPDATA%\Claude\claude_desktop_config.json
+
+Mac:
+  ~/Library/Application Support/Claude/claude_desktop_config.json
+
+Linux:
+  ~/.config/claude/claude_desktop_config.json
+
+For each gaming PC, add an entry under "mcpServers":
+
+  Name format: gaming-pc-1, gaming-pc-2, etc.
+  Transport: sse
+  URL: http://<PC-IP>:8765/mcp
+  Headers: Authorization header with "Bearer <password>"
+
+
+NETWORK CONFIGURATION
+---------------------
+Default Port: 8765
+
+Firewall Rules:
+  - Allow inbound TCP on configured port
+  - Allow from Claude's IP or your local network
+
+For remote access over internet:
+  - Use a VPN (strongly recommended)
+  - Or set up reverse proxy with TLS
+
+
+MULTIPLE PC SETUP
+-----------------
+Each gaming PC needs:
+  1. Unique password (recommended)
+  2. Same port or different ports
+  3. Firewall configured
+  4. Corresponding entry in Claude Desktop config
+
+Naming Convention:
+  gaming-pc-1 - First PC
+  gaming-pc-2 - Second PC
+  gaming-pc-N - Nth PC
+
+
+RECOMMENDED LOCAL VLM MODELS
+----------------------------
+Model            | VRAM  | Speed    | Quality | Best For
+-----------------+-------+----------+---------+-----------------
+Moondream 2B     | 4GB   | Fastest  | Good    | Basic UI tasks
+Qwen2.5-VL-3B    | 6GB   | Fast     | Better  | Best balance
+Qwen3-VL-2B      | 5GB   | Fast     | Better  | GUI-optimized
+Qwen3-VL-4B      | 8GB   | Moderate | Best    | High quality
+Gemma 3 4B       | 8GB   | Moderate | Better  | Multilingual
+
+
+ENVIRONMENT VARIABLES
+---------------------
+These override config file settings:
+
+  GAMING_AGENT_PORT     - Server port
+  GAMING_AGENT_PASSWORD - Authentication password
+  GAMING_AGENT_VLM      - Enable VLM (1 or 0)
+  GAMING_AGENT_DEBUG    - Enable debug logging
