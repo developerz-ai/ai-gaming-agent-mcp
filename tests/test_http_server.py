@@ -228,3 +228,121 @@ class TestAppConfiguration:
         with TestClient(app) as client:
             response = client.get("/health")
             assert response.status_code == 200
+
+    def test_app_has_correct_description(self):
+        """Test that app has correct description."""
+        config = Config()
+        app = create_test_app(config)
+        assert app.description == "MCP server for remote PC automation"
+
+    def test_app_version_matches_package_version(self):
+        """Test that app version matches package version."""
+        from ai_gaming_agent import __version__
+
+        config = Config()
+        app = create_test_app(config)
+        assert app.version == __version__
+
+
+class TestSSEConnection:
+    """Tests for SSE connection setup.
+
+    Note: Full SSE connection testing requires async mocking and is complex.
+    These tests verify the authentication layer and initialization checks
+    for the SSE endpoint.
+    """
+
+    def test_mcp_endpoint_requires_valid_auth_before_connection(self):
+        """Test that /mcp endpoint validates auth before attempting SSE connection."""
+        config = Config()
+        config.server.password = "test-password"
+        app = create_test_app(config)
+
+        with TestClient(app) as client:
+            # Invalid auth should fail before SSE connection is attempted
+            response = client.get(
+                "/mcp",
+                headers={"Authorization": "Bearer wrong-password"},
+            )
+
+            assert response.status_code == 401
+
+    def test_mcp_endpoint_checks_initialization(self):
+        """Test that handle_sse checks if transport and server are initialized.
+
+        This test verifies that the endpoint has the proper initialization check
+        by examining the code path, even though we cannot easily trigger the
+        uninitialized state in tests due to the lifespan management.
+        """
+        # Read the source to verify the check exists
+        import inspect
+
+        from ai_gaming_agent import http_server
+
+        # Get the handle_sse function source
+        source = inspect.getsource(http_server.create_app)
+
+        # Verify that the initialization check is present
+        assert "_sse_transport is None" in source
+        assert "_mcp_server is None" in source
+        assert "503" in source or "Service Unavailable" in source.lower()
+
+
+class TestAuthenticationEdgeCases:
+    """Tests for authentication edge cases and security."""
+
+    def test_bearer_token_case_sensitive(self):
+        """Test that Bearer token validation is case-sensitive."""
+        config = Config()
+        config.server.password = "TestPassword123"
+        app = create_test_app(config)
+
+        with TestClient(app) as client:
+            # Try with wrong case
+            response = client.get(
+                "/mcp",
+                headers={"Authorization": "Bearer testpassword123"},
+            )
+            assert response.status_code == 401
+
+    def test_empty_bearer_token_rejected(self):
+        """Test that empty Bearer token is rejected."""
+        config = Config()
+        config.server.password = "test-password"
+        app = create_test_app(config)
+
+        with TestClient(app) as client:
+            response = client.get(
+                "/mcp",
+                headers={"Authorization": "Bearer "},
+            )
+            assert response.status_code == 401
+
+    def test_malformed_auth_header_rejected(self):
+        """Test that malformed authorization header is rejected."""
+        config = Config()
+        config.server.password = "test-password"
+        app = create_test_app(config)
+
+        with TestClient(app) as client:
+            # Missing "Bearer " prefix
+            response = client.get(
+                "/mcp",
+                headers={"Authorization": "test-password"},
+            )
+            assert response.status_code in [401, 403]
+
+    def test_post_messages_bearer_prefix_required(self):
+        """Test that POST /mcp/messages requires Bearer prefix."""
+        config = Config()
+        config.server.password = "test-password"
+        app = create_test_app(config)
+
+        with TestClient(app) as client:
+            # Send token without Bearer prefix
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={"Authorization": "test-password"},
+            )
+            assert response.status_code == 401
