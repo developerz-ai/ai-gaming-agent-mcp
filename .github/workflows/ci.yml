@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  CI: true  # Signals to skip integration tests
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -30,5 +33,15 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check src tests
 
-      - name: Run tests
-        run: uv run pytest -v
+      - name: Run unit tests (skip integration)
+        run: uv run pytest tests/ --ignore=tests/integration -v
+
+  # Integration tests are LOCAL ONLY - they require a real display
+  # Run locally with: uv run pytest tests/integration -v
+  #
+  # Why integration tests can't run in CI:
+  # - Require real display (X11/Wayland/Windows/macOS desktop)
+  # - Perform actual mouse movements and clicks
+  # - Open real applications (terminals)
+  # - Need tesseract-ocr for OCR verification
+  # - Could interfere with other processes

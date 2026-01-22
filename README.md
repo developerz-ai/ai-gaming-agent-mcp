@@ -155,15 +155,96 @@ Create `~/.gaming-agent/config.json`:
 ## Development
 
 ```bash
-# Install dev dependencies
+# Install with uv (recommended)
+uv sync --extra dev
+
+# Or with pip
 pip install -e ".[dev]"
 
-# Run tests
-pytest
-
 # Lint
-ruff check src tests
+uv run ruff check src tests
+
+# Run unit tests
+uv run pytest tests/ --ignore=tests/integration -v
 ```
+
+## Testing
+
+### Unit Tests (CI)
+
+Unit tests run in CI on every push/PR. They test configuration, file operations, and tool interfaces without requiring a display.
+
+```bash
+# Run unit tests only
+uv run pytest tests/ --ignore=tests/integration -v
+```
+
+### Integration Tests (Local Only)
+
+Integration tests perform **real GUI automation** and require:
+- A real display (X11, Wayland, Windows, macOS)
+- `tesseract-ocr` for OCR verification
+- pyautogui working with your display
+
+**These tests CANNOT run in CI** because they need a real desktop environment.
+
+```bash
+# Install integration test dependencies
+uv sync --extra integration
+
+# Install tesseract (Linux)
+sudo apt install tesseract-ocr
+
+# Install tesseract (macOS)
+brew install tesseract
+
+# Run integration tests locally
+uv run pytest tests/integration -v
+```
+
+#### What Integration Tests Do
+
+| Test | Description |
+|------|-------------|
+| `test_screenshot_returns_image` | Captures real screen content |
+| `test_ocr_screen_content` | Uses OCR to read text from screen |
+| `test_mouse_move` | Moves mouse cursor to position |
+| `test_mouse_click` | Performs real mouse click |
+| `test_type_text` | Types actual text |
+| `test_terminal_workflow` | Opens terminal, types command, closes |
+| `test_terminal_with_ocr_verification` | Opens terminal, runs command, verifies output with OCR |
+| `test_batch_gui_operations` | Runs 7 GUI operations in sequence |
+
+#### Terminal Workflow Test
+
+The most comprehensive test opens a terminal, types a command, and verifies the output:
+
+```python
+# What the test does:
+1. Opens system terminal (gnome-terminal, konsole, xterm, etc.)
+2. Types: echo "AGENT_TEST_abc12345"
+3. Presses Enter
+4. Takes screenshot
+5. Runs OCR on screenshot
+6. Verifies "AGENT_TEST_abc12345" appears in OCR output
+7. Closes terminal with Alt+F4
+```
+
+### CI Configuration
+
+CI runs on GitHub Actions with Python 3.12 only:
+
+```yaml
+# .github/workflows/ci.yml
+- Checkout code
+- Install uv
+- Install Python 3.12
+- Install system deps (xvfb, scrot, python3-tk)
+- Run ruff lint
+- Run unit tests (integration tests excluded)
+```
+
+Integration tests are auto-skipped in CI via the `CI=true` environment variable.
 
 ## License
 

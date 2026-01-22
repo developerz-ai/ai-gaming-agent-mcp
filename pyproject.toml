@@ -44,6 +44,10 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "ruff>=0.8.0",
 ]
+integration = [
+    "pytest>=8.0.0",
+    "pytesseract>=0.3.10",
+]
 
 [project.scripts]
 gaming-agent = "ai_gaming_agent.cli:main"
@@ -67,3 +71,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (require display, run locally only)",
+]
