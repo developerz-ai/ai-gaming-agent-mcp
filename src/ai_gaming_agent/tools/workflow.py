@@ -7,10 +7,70 @@ enabling single-command workflows like "open terminal, type command, close".
 from __future__ import annotations
 
 import logging
+import platform
+import subprocess
 import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_terminal_command() -> str | None:
+    """Detect the appropriate terminal command for the current platform.
+
+    Returns:
+        Terminal command string, or None if no terminal found.
+    """
+    system = platform.system()
+
+    if system == "Linux":
+        # Try common Linux terminals in order of preference
+        terminals = [
+            "gnome-terminal",
+            "konsole",
+            "xfce4-terminal",
+            "mate-terminal",
+            "tilix",
+            "terminator",
+            "xterm",
+        ]
+        for term in terminals:
+            try:
+                result = subprocess.run(
+                    ["which", term],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    return term
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
+        return None
+
+    elif system == "Darwin":
+        # macOS - use Terminal.app
+        return "open -a Terminal"
+
+    elif system == "Windows":
+        # Windows - use cmd
+        return "cmd"
+
+    return None
+
+
+def _get_close_terminal_keys() -> list[str]:
+    """Get the hotkey to close a terminal window for current platform.
+
+    Returns:
+        List of keys to press together to close terminal.
+    """
+    system = platform.system()
+    if system == "Darwin":
+        return ["cmd", "q"]
+    else:
+        # Linux and Windows both use Alt+F4
+        return ["alt", "f4"]
 
 
 def _get_tool_handler(tool_name: str) -> Any | None:
@@ -234,3 +294,208 @@ def run_workflow(steps: list[dict[str, Any]]) -> dict[str, Any]:
         "total_time_ms": total_time_ms,
         "error": results[failed_step]["error"] if failed_step is not None else None,
     }
+
+
+def demo_terminal_workflow(
+    text: str = "echo hello world",
+    terminal_wait_ms: int = 2000,
+    post_type_wait_ms: int = 500,
+    post_enter_wait_ms: int = 1000,
+    capture_screenshot: bool = True,
+    close_terminal: bool = True,
+) -> dict[str, Any]:
+    """Execute a complete terminal workflow: open, type, execute, screenshot, close.
+
+    This is a convenience function that demonstrates the full automation capability
+    by performing a complete terminal workflow in a single call. It:
+    1. Detects the appropriate terminal application for the platform
+    2. Opens the terminal
+    3. Waits for it to fully load
+    4. Types the provided text (command)
+    5. Presses Enter to execute the command
+    6. Waits for command output
+    7. Optionally captures a screenshot for verification
+    8. Optionally closes the terminal window
+
+    Args:
+        text: The text/command to type in the terminal. Defaults to "echo hello world".
+        terminal_wait_ms: Milliseconds to wait for terminal to open. Defaults to 2000.
+        post_type_wait_ms: Milliseconds to wait after typing. Defaults to 500.
+        post_enter_wait_ms: Milliseconds to wait after pressing Enter. Defaults to 1000.
+        capture_screenshot: Whether to take a screenshot after command execution.
+                           Defaults to True.
+        close_terminal: Whether to close the terminal at the end. Defaults to True.
+
+    Returns:
+        Dictionary containing:
+            - success (bool): True if all steps completed successfully
+            - terminal_command (str): The terminal application used
+            - platform (str): The operating system
+            - text_typed (str): The text that was typed
+            - screenshot (dict | None): Screenshot result if captured, else None
+            - steps_completed (list[str]): List of completed step names
+            - total_time_ms (int): Total execution time in milliseconds
+            - error (str | None): Error message if any step failed
+
+    Example:
+        >>> demo_terminal_workflow("echo hello world")
+        {
+            'success': True,
+            'terminal_command': 'gnome-terminal',
+            'platform': 'Linux',
+            'text_typed': 'echo hello world',
+            'screenshot': {'success': True, 'image': '...', ...},
+            'steps_completed': ['detect_terminal', 'open_terminal', 'wait_for_terminal',
+                               'type_text', 'press_enter', 'capture_screenshot',
+                               'close_terminal'],
+            'total_time_ms': 4523,
+            'error': None
+        }
+
+        >>> demo_terminal_workflow("ls -la", close_terminal=False)
+        {
+            'success': True,
+            ...
+            'steps_completed': ['detect_terminal', 'open_terminal', 'wait_for_terminal',
+                               'type_text', 'press_enter', 'capture_screenshot'],
+            ...
+        }
+    """
+    start_time = time.time()
+    steps_completed: list[str] = []
+    screenshot_result: dict[str, Any] | None = None
+    current_platform = platform.system()
+
+    result: dict[str, Any] = {
+        "success": False,
+        "terminal_command": None,
+        "platform": current_platform,
+        "text_typed": text,
+        "screenshot": None,
+        "steps_completed": steps_completed,
+        "total_time_ms": 0,
+        "error": None,
+    }
+
+    try:
+        # Step 1: Detect terminal command
+        terminal_cmd = _detect_terminal_command()
+        if not terminal_cmd:
+            result["error"] = f"No supported terminal found for platform: {current_platform}"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        result["terminal_command"] = terminal_cmd
+        steps_completed.append("detect_terminal")
+        logger.debug(f"Detected terminal: {terminal_cmd}")
+
+        # Step 2: Open terminal
+        try:
+            if current_platform == "Linux":
+                subprocess.Popen([terminal_cmd])
+            else:
+                subprocess.Popen(terminal_cmd, shell=True)
+            steps_completed.append("open_terminal")
+            logger.debug("Terminal process started")
+        except Exception as e:
+            result["error"] = f"Failed to open terminal: {e}"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        # Step 3: Wait for terminal to fully load
+        time.sleep(terminal_wait_ms / 1000.0)
+        steps_completed.append("wait_for_terminal")
+        logger.debug(f"Waited {terminal_wait_ms}ms for terminal")
+
+        # Step 4: Type the text
+        # Import lazily to avoid GUI dependency issues in CI
+        type_text_handler = _get_tool_handler("type_text")
+        if type_text_handler is None:
+            result["error"] = "Failed to load type_text tool"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        type_result = type_text_handler(text=text, interval=0.02)
+        if not type_result.get("success", False):
+            result["error"] = f"Failed to type text: {type_result.get('error', 'Unknown error')}"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        steps_completed.append("type_text")
+        logger.debug(f"Typed text: {text}")
+
+        # Wait after typing
+        time.sleep(post_type_wait_ms / 1000.0)
+
+        # Step 5: Press Enter to execute the command
+        press_key_handler = _get_tool_handler("press_key")
+        if press_key_handler is None:
+            result["error"] = "Failed to load press_key tool"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        enter_result = press_key_handler(key="enter")
+        if not enter_result.get("success", False):
+            result["error"] = f"Failed to press Enter: {enter_result.get('error', 'Unknown error')}"
+            result["total_time_ms"] = int((time.time() - start_time) * 1000)
+            return result
+
+        steps_completed.append("press_enter")
+        logger.debug("Pressed Enter")
+
+        # Wait for command to execute
+        time.sleep(post_enter_wait_ms / 1000.0)
+
+        # Step 6: Capture screenshot if requested
+        if capture_screenshot:
+            screenshot_handler = _get_tool_handler("screenshot")
+            if screenshot_handler is not None:
+                screenshot_result = screenshot_handler()
+                result["screenshot"] = screenshot_result
+                if screenshot_result.get("success", False):
+                    steps_completed.append("capture_screenshot")
+                    logger.debug(
+                        f"Screenshot captured: {screenshot_result.get('width')}x{screenshot_result.get('height')}"
+                    )
+                else:
+                    logger.warning(f"Screenshot failed: {screenshot_result.get('error', 'Unknown error')}")
+            else:
+                logger.warning("Screenshot tool not available")
+
+        # Step 7: Close terminal if requested
+        if close_terminal:
+            hotkey_handler = _get_tool_handler("hotkey")
+            if hotkey_handler is not None:
+                close_keys = _get_close_terminal_keys()
+                close_result = hotkey_handler(keys=close_keys)
+                if close_result.get("success", False):
+                    steps_completed.append("close_terminal")
+                    logger.debug(f"Terminal closed with hotkey: {close_keys}")
+                else:
+                    logger.warning(f"Failed to close terminal: {close_result.get('error', 'Unknown error')}")
+            else:
+                logger.warning("Hotkey tool not available")
+
+        # Success!
+        result["success"] = True
+        result["total_time_ms"] = int((time.time() - start_time) * 1000)
+        logger.info(f"Terminal workflow completed successfully in {result['total_time_ms']}ms")
+        return result
+
+    except Exception as e:
+        result["error"] = str(e)
+        result["total_time_ms"] = int((time.time() - start_time) * 1000)
+        logger.exception("Terminal workflow failed with exception")
+
+        # Try to close terminal on error if we opened it
+        if "open_terminal" in steps_completed and close_terminal:
+            try:
+                hotkey_handler = _get_tool_handler("hotkey")
+                if hotkey_handler is not None:
+                    close_keys = _get_close_terminal_keys()
+                    hotkey_handler(keys=close_keys)
+                    logger.debug("Closed terminal after error")
+            except Exception:
+                pass
+
+        return result

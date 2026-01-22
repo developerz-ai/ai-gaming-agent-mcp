@@ -123,7 +123,9 @@ class TestServeCommand:
 
         with patch("ai_gaming_agent.cli.Config.load", return_value=mock_config):
             with patch("ai_gaming_agent.cli.asyncio.run") as mock_asyncio_run:
-                with patch.dict("sys.modules", {"ai_gaming_agent.http_server": MagicMock(run_http_server=mock_run_http_server)}):
+                with patch.dict(
+                    "sys.modules", {"ai_gaming_agent.http_server": MagicMock(run_http_server=mock_run_http_server)}
+                ):
                     with patch("ai_gaming_agent.cli.sys.stderr", new_callable=StringIO):
                         cmd_serve(args)
                         mock_asyncio_run.assert_called_once()
@@ -148,7 +150,9 @@ class TestServeCommand:
 
         with patch("ai_gaming_agent.cli.Config.load", return_value=mock_config):
             with patch("ai_gaming_agent.cli.asyncio.run"):
-                with patch.dict("sys.modules", {"ai_gaming_agent.http_server": MagicMock(run_http_server=mock_run_http_server)}):
+                with patch.dict(
+                    "sys.modules", {"ai_gaming_agent.http_server": MagicMock(run_http_server=mock_run_http_server)}
+                ):
                     with patch("ai_gaming_agent.cli.sys.stderr", stderr):
                         cmd_serve(args)
 

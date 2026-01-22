@@ -104,11 +104,13 @@ def list_files(path: str) -> dict[str, Any]:
 
         items = []
         for item in dir_path.iterdir():
-            items.append({
-                "name": item.name,
-                "is_dir": item.is_dir(),
-                "size": item.stat().st_size if item.is_file() else 0,
-            })
+            items.append(
+                {
+                    "name": item.name,
+                    "is_dir": item.is_dir(),
+                    "size": item.stat().st_size if item.is_file() else 0,
+                }
+            )
 
         return {"success": True, "items": items}
     except Exception as e:
