@@ -245,6 +245,55 @@ TOOL_DEFINITIONS = [
             },
         },
     ),
+    # Workflow tools
+    Tool(
+        name="run_workflow",
+        description=(
+            "Execute a sequence of tool actions as a single workflow. "
+            "Allows chaining multiple tool calls together with optional delays. "
+            "Useful for complex automation tasks like opening a terminal, "
+            "typing commands, and closing it - all in one call."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "description": "List of steps to execute sequentially",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "tool": {
+                                "type": "string",
+                                "description": "Name of the tool to call",
+                            },
+                            "args": {
+                                "type": "object",
+                                "description": "Arguments to pass to the tool",
+                                "default": {},
+                            },
+                            "wait_ms": {
+                                "type": "integer",
+                                "description": "Milliseconds to wait after this step",
+                                "default": 0,
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Human-readable description of the step",
+                            },
+                            "continue_on_error": {
+                                "type": "boolean",
+                                "description": "Continue workflow if this step fails",
+                                "default": False,
+                            },
+                        },
+                        "required": ["tool"],
+                    },
+                },
+            },
+            "required": ["steps"],
+        },
+    ),
 ]
 
 # Map tool names to functions
@@ -269,6 +318,8 @@ TOOL_HANDLERS = {
     "get_system_info": tools.get_system_info,
     "list_windows": tools.list_windows,
     "focus_window": tools.focus_window,
+    # Workflow
+    "run_workflow": tools.run_workflow,
 }
 
 
