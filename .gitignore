@@ -67,3 +67,4 @@ Thumbs.db
 
 # Runtime state
 .gaming-agent/
+.claude-task-master/

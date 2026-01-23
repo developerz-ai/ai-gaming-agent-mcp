@@ -1,1 +1,0 @@
-so do full impelemntation, the is to have an mcp server, sucess: to send one big command, open a new terminal focus it type echo hello world and then click to close it, all tested, debugged witha all the features, documented, full production ready
