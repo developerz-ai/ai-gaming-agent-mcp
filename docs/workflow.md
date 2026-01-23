@@ -198,7 +198,7 @@ These are the tools you can use inside `run_workflow`:
 - `get_mouse_position` - Get cursor location
 
 #### Keyboard Tools
-- `type_text` - Type a string
+- `type_text` - Type a string (supports fast paste mode via `use_paste` parameter)
 - `press_key` - Press a key
 - `hotkey` - Key combination (e.g., "ctrl+c")
 
@@ -527,7 +527,46 @@ Use `analyze_screen` to make decisions:
 }
 ```
 
-### 3. Capture Verification Screenshots
+### 3. Use Fast Paste for Long Text Input
+
+For typing long strings (passwords, code, multiline text), use the `use_paste` option for dramatically faster input:
+
+```json
+// ✓ Good - Fast paste for long text (microseconds)
+{
+  "tool": "type_text",
+  "args": {
+    "text": "def calculate_fibonacci(n):\n    if n <= 1:\n        return n\n    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)",
+    "use_paste": true
+  },
+  "wait_ms": 300,
+  "description": "Paste long Python code"
+}
+
+// ✗ Slower - Character-by-character typing
+{
+  "tool": "type_text",
+  "args": {
+    "text": "def calculate_fibonacci(n):\n    if n <= 1:\n        return n\n    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)",
+    "interval": 0.01
+  },
+  "wait_ms": 300,
+  "description": "Type long Python code character by character"
+}
+```
+
+**When to use `use_paste`:**
+- Long text (>50 characters)
+- Passwords or sensitive data (faster = less visual exposure)
+- Multiline code or configuration
+- Time-critical workflows
+
+**When to use regular typing:**
+- Short text (<20 characters)
+- Applications with strict clipboard policies
+- When clipboard contents must be preserved
+
+### 4. Capture Verification Screenshots
 
 ```json
 // ✓ Good - Verify each major step
@@ -539,7 +578,7 @@ Use `analyze_screen` to make decisions:
 }
 ```
 
-### 4. Use hotkey for Cross-Platform Keys
+### 5. Use hotkey for Cross-Platform Keys
 
 ```json
 // ✓ Good - Works on all platforms
@@ -556,7 +595,7 @@ Use `analyze_screen` to make decisions:
 }
 ```
 
-### 5. Keep Workflows Focused
+### 6. Keep Workflows Focused
 
 ```json
 // ✓ Good - Single responsibility
@@ -580,7 +619,7 @@ Use `analyze_screen` to make decisions:
 }
 ```
 
-### 6. Enable Error Recovery for Long Workflows
+### 7. Enable Error Recovery for Long Workflows
 
 ```json
 // ✓ Good - Handle potential failures
@@ -596,7 +635,7 @@ Use `analyze_screen` to make decisions:
 }
 ```
 
-### 7. Add Pauses Before Screenshot
+### 8. Add Pauses Before Screenshot
 
 ```json
 // ✓ Good - Give UI time to update
@@ -892,6 +931,82 @@ results = await asyncio.gather(
         "args": {"command": "grep -i 'level' /home/user/.game/latest.log"},
         "wait_ms": 500,
         "description": "Extract level info"
+      }
+    ]
+  }
+}
+```
+
+### Example 5: Fast Paste - Enter Long Password
+
+```json
+{
+  "tool": "run_workflow",
+  "args": {
+    "steps": [
+      {
+        "tool": "click",
+        "args": {"x": 400, "y": 300},
+        "wait_ms": 200,
+        "description": "Click password field"
+      },
+      {
+        "tool": "type_text",
+        "args": {
+          "text": "MySecurePassword123!@#$%^&*()",
+          "use_paste": true
+        },
+        "wait_ms": 200,
+        "description": "Paste long password (faster and less exposure)"
+      },
+      {
+        "tool": "press_key",
+        "args": {"key": "return"},
+        "wait_ms": 2000,
+        "description": "Submit login"
+      },
+      {
+        "tool": "screenshot",
+        "args": {},
+        "description": "Verify login success"
+      }
+    ]
+  }
+}
+```
+
+### Example 6: Fast Paste - Enter Code in Editor
+
+```json
+{
+  "tool": "run_workflow",
+  "args": {
+    "steps": [
+      {
+        "tool": "execute_command",
+        "args": {"command": "gedit /tmp/script.py"},
+        "wait_ms": 2000,
+        "description": "Open text editor"
+      },
+      {
+        "tool": "type_text",
+        "args": {
+          "text": "#!/usr/bin/env python3\n# Fast script entry via paste\nimport os\nimport sys\n\nprint('Hello from pasted script!')\nprint(f'Platform: {sys.platform}')\nprint(f'Python: {sys.version}')\n",
+          "use_paste": true
+        },
+        "wait_ms": 300,
+        "description": "Paste Python script (use_paste is much faster for multiline)"
+      },
+      {
+        "tool": "hotkey",
+        "args": {"keys": ["ctrl", "s"]},
+        "wait_ms": 500,
+        "description": "Save file"
+      },
+      {
+        "tool": "screenshot",
+        "args": {},
+        "description": "Verify code saved"
       }
     ]
   }

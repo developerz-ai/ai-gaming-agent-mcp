@@ -74,11 +74,14 @@ KEYBOARD TOOLS
 --------------
 
 type_text
-  Description: Type a string of text
+  Description: Type a string of text. Supports fast input via clipboard paste.
   Parameters:
     text - Text to type
-    interval (optional) - Delay between keystrokes
-  Returns: Success or failure status
+    interval (optional) - Delay between keystrokes in seconds (ignored if use_paste=True)
+    use_paste (optional) - Use clipboard paste for faster input instead of typing. Copies
+                          text to clipboard and simulates Ctrl+V (Cmd+V on macOS). Much
+                          faster for long text. Default: false
+  Returns: Success or failure status with method used (type or paste)
 
 press_key
   Description: Press a single keyboard key
