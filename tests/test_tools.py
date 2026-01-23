@@ -113,10 +113,11 @@ def test_type_text_method_field():
 
 
 # ============================================================================
-# UNIT TESTS FOR PASTE FUNCTIONALITY (mocked - works in CI)
+# UNIT TESTS FOR PASTE FUNCTIONALITY (requires GUI - skip in CI)
 # ============================================================================
 
 
+@pytest.mark.skipif(not HAS_GUI, reason="GUI not available (pyautogui import fails in CI)")
 class TestTypeTextPasteMocked:
     """Unit tests for type_text paste functionality using mocks.
 
