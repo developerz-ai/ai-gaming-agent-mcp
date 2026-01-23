@@ -151,9 +151,7 @@ def create_app(config: Config | None = None) -> FastAPI:
 
         logger.info(f"New MCP SSE connection from {request.client}")
 
-        async with _sse_transport.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
+        async with _sse_transport.connect_sse(request.scope, request.receive, request._send) as streams:
             await _mcp_server.run(
                 streams[0],
                 streams[1],

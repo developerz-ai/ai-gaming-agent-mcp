@@ -294,6 +294,51 @@ TOOL_DEFINITIONS = [
             "required": ["steps"],
         },
     ),
+    Tool(
+        name="demo_terminal_workflow",
+        description=(
+            "Execute a complete terminal demo workflow: open terminal, "
+            "type a command, press Enter, take a screenshot, and close the terminal. "
+            "This is a convenience function that demonstrates full automation capability "
+            "in a single call. Automatically detects the appropriate terminal application "
+            "for the current platform (Linux, macOS, Windows)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text/command to type in the terminal",
+                    "default": "echo hello world",
+                },
+                "terminal_wait_ms": {
+                    "type": "integer",
+                    "description": "Milliseconds to wait for terminal to open",
+                    "default": 2000,
+                },
+                "post_type_wait_ms": {
+                    "type": "integer",
+                    "description": "Milliseconds to wait after typing",
+                    "default": 500,
+                },
+                "post_enter_wait_ms": {
+                    "type": "integer",
+                    "description": "Milliseconds to wait after pressing Enter",
+                    "default": 1000,
+                },
+                "capture_screenshot": {
+                    "type": "boolean",
+                    "description": "Whether to take a screenshot after command execution",
+                    "default": True,
+                },
+                "close_terminal": {
+                    "type": "boolean",
+                    "description": "Whether to close the terminal at the end",
+                    "default": True,
+                },
+            },
+        },
+    ),
 ]
 
 # Map tool names to functions
@@ -320,6 +365,7 @@ TOOL_HANDLERS = {
     "focus_window": tools.focus_window,
     # Workflow
     "run_workflow": tools.run_workflow,
+    "demo_terminal_workflow": tools.demo_terminal_workflow,
 }
 
 

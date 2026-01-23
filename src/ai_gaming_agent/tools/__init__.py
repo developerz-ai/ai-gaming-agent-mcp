@@ -6,7 +6,7 @@ Tools are organized into modules:
 - keyboard: type_text, press_key, hotkey
 - files: read_file, write_file, list_files, upload_file, download_file
 - system: execute_command, get_system_info, list_windows, focus_window
-- workflow: run_workflow (composite tool for multi-step automation)
+- workflow: run_workflow, demo_terminal_workflow (composite tools for multi-step automation)
 
 Import tools directly from submodules to avoid GUI dependency issues:
     from ai_gaming_agent.tools.files import read_file
@@ -42,6 +42,7 @@ __all__ = [
     "focus_window",
     # Workflow
     "run_workflow",
+    "demo_terminal_workflow",
 ]
 
 _MODULE_MAP = {
@@ -67,6 +68,7 @@ _MODULE_MAP = {
     "focus_window": "system",
     # Workflow
     "run_workflow": "workflow",
+    "demo_terminal_workflow": "workflow",
 }
 
 

@@ -9,9 +9,7 @@ import pytest
 # Auto-skip all integration tests in CI or when no display available
 def pytest_configure(config):
     """Register integration marker and check environment."""
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests (require display)"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests (require display)")
 
 
 def pytest_collection_modifyitems(config, items):
