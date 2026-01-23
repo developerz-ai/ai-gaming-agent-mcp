@@ -69,6 +69,7 @@ def test_keyboard_functions_return_dict():
     result = type_text("test")
     assert isinstance(result, dict)
     assert "success" in result
+    assert result.get("method") == "type"
 
     result = press_key("enter")
     assert isinstance(result, dict)
@@ -77,6 +78,36 @@ def test_keyboard_functions_return_dict():
     result = hotkey(["ctrl", "c"])
     assert isinstance(result, dict)
     assert "success" in result
+
+
+@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
+def test_type_text_with_paste():
+    """Test type_text with use_paste=True for fast clipboard-based input."""
+    from ai_gaming_agent.tools.keyboard import type_text
+
+    # Test paste method returns correct result structure
+    result = type_text("hello world", use_paste=True)
+    assert isinstance(result, dict)
+    assert "success" in result
+    if result["success"]:
+        assert result.get("method") == "paste"
+        assert result.get("text") == "hello world"
+
+
+@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
+def test_type_text_method_field():
+    """Test that type_text returns 'method' field indicating input method used."""
+    from ai_gaming_agent.tools.keyboard import type_text
+
+    # Regular typing should report "type" method
+    result = type_text("test", use_paste=False)
+    if result["success"]:
+        assert result.get("method") == "type"
+
+    # Paste should report "paste" method
+    result = type_text("test", use_paste=True)
+    if result["success"]:
+        assert result.get("method") == "paste"
 
 
 @pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
