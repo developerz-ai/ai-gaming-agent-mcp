@@ -339,6 +339,34 @@ TOOL_DEFINITIONS = [
             },
         },
     ),
+    # VLM tools
+    Tool(
+        name="analyze_screen",
+        description=(
+            "Analyze the current screen using a Vision Language Model (VLM). "
+            "Takes a screenshot and sends it to the configured VLM (e.g., Ollama with qwen2.5-vl) "
+            "along with a prompt for analysis. Useful for understanding game state, reading text, "
+            "or identifying UI elements. Requires VLM to be enabled in config."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": (
+                        "The analysis prompt/question about the screen content. "
+                        "Examples: 'What is the current health bar percentage?', "
+                        "'Is there a dialog box on screen?', 'List all visible menu options'"
+                    ),
+                },
+                "monitor": {
+                    "type": "integer",
+                    "description": "Optional monitor index for multi-monitor setups",
+                },
+            },
+            "required": ["prompt"],
+        },
+    ),
 ]
 
 # Map tool names to functions
@@ -366,6 +394,8 @@ TOOL_HANDLERS = {
     # Workflow
     "run_workflow": tools.run_workflow,
     "demo_terminal_workflow": tools.demo_terminal_workflow,
+    # VLM
+    "analyze_screen": tools.analyze_screen,
 }
 
 

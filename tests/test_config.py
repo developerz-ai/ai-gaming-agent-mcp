@@ -3,7 +3,9 @@
 import tempfile
 from pathlib import Path
 
-from ai_gaming_agent.config import Config, SecurityConfig, ServerConfig
+import pytest
+
+from ai_gaming_agent.config import Config, SecurityConfig, ServerConfig, VLMConfig
 
 
 def test_default_config():
@@ -54,3 +56,122 @@ def test_config_load_nonexistent():
     config = Config.load(Path("/nonexistent/path/config.json"))
     # Should return defaults
     assert config.server.port == 8765
+
+
+class TestVLMConfig:
+    """Tests for VLM configuration validation."""
+
+    def test_vlm_disabled_no_validation(self):
+        """Test that VLM validation is skipped when disabled."""
+        # This should not raise even with invalid values
+        vlm = VLMConfig(
+            enabled=False,
+            provider="invalid_provider",
+            model="",
+            endpoint="not_a_url",
+        )
+        assert vlm.enabled is False
+
+    def test_vlm_enabled_valid_config(self):
+        """Test that valid VLM config is accepted."""
+        vlm = VLMConfig(
+            enabled=True,
+            provider="ollama",
+            model="qwen2.5-vl:3b",
+            endpoint="http://localhost:11434",
+        )
+        assert vlm.enabled is True
+        assert vlm.provider == "ollama"
+        assert vlm.model == "qwen2.5-vl:3b"
+
+    def test_vlm_enabled_https_endpoint(self):
+        """Test that https endpoints are accepted."""
+        vlm = VLMConfig(
+            enabled=True,
+            provider="ollama",
+            model="qwen2.5-vl:3b",
+            endpoint="https://remote-ollama.example.com:11434",
+        )
+        assert vlm.endpoint == "https://remote-ollama.example.com:11434"
+
+    def test_vlm_enabled_unsupported_provider(self):
+        """Test that unsupported provider raises error when VLM is enabled."""
+        with pytest.raises(ValueError, match="Unsupported VLM provider"):
+            VLMConfig(
+                enabled=True,
+                provider="unsupported_provider",
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+    def test_vlm_enabled_empty_model(self):
+        """Test that empty model name raises error when VLM is enabled."""
+        with pytest.raises(ValueError, match="model name cannot be empty"):
+            VLMConfig(
+                enabled=True,
+                provider="ollama",
+                model="",
+                endpoint="http://localhost:11434",
+            )
+
+    def test_vlm_enabled_empty_endpoint(self):
+        """Test that empty endpoint raises error when VLM is enabled."""
+        with pytest.raises(ValueError, match="endpoint URL cannot be empty"):
+            VLMConfig(
+                enabled=True,
+                provider="ollama",
+                model="qwen2.5-vl:3b",
+                endpoint="",
+            )
+
+    def test_vlm_enabled_invalid_endpoint_format(self):
+        """Test that endpoint without http(s) prefix raises error."""
+        with pytest.raises(ValueError, match="must start with http"):
+            VLMConfig(
+                enabled=True,
+                provider="ollama",
+                model="qwen2.5-vl:3b",
+                endpoint="localhost:11434",
+            )
+
+    def test_vlm_enabled_ftp_endpoint_rejected(self):
+        """Test that non-http(s) protocols are rejected."""
+        with pytest.raises(ValueError, match="must start with http"):
+            VLMConfig(
+                enabled=True,
+                provider="ollama",
+                model="qwen2.5-vl:3b",
+                endpoint="ftp://localhost:11434",
+            )
+
+    def test_vlm_default_config(self):
+        """Test VLM default configuration."""
+        vlm = VLMConfig()
+        assert vlm.enabled is False
+        assert vlm.provider == "ollama"
+        assert vlm.model == "qwen2.5-vl:3b"
+        assert vlm.endpoint == "http://localhost:11434"
+
+    def test_config_with_enabled_vlm(self):
+        """Test full Config object with enabled VLM."""
+        config = Config(
+            vlm=VLMConfig(
+                enabled=True,
+                provider="ollama",
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+        )
+        assert config.vlm.enabled is True
+
+    def test_config_vlm_validation_in_full_config(self):
+        """Test that VLM validation works within full Config object."""
+        with pytest.raises(ValueError, match="Unsupported VLM provider"):
+            Config(
+                vlm=VLMConfig(
+                    enabled=True,
+                    provider="invalid",
+                    model="test",
+                    endpoint="http://localhost:11434",
+                )
+            )
