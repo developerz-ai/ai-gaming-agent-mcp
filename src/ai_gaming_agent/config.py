@@ -25,6 +25,34 @@ class VLMConfig(BaseModel):
     model: str = "qwen2.5-vl:3b"
     endpoint: str = "http://localhost:11434"
 
+    def model_post_init(self, __context: object) -> None:
+        """Validate VLM configuration after initialization."""
+        # Only validate if VLM is enabled
+        if not self.enabled:
+            return
+
+        # Validate provider is supported
+        supported_providers = ["ollama"]
+        if self.provider not in supported_providers:
+            raise ValueError(
+                f"Unsupported VLM provider: {self.provider}. "
+                f"Supported providers: {', '.join(supported_providers)}"
+            )
+
+        # Validate model name is not empty
+        if not self.model or not self.model.strip():
+            raise ValueError("VLM model name cannot be empty when VLM is enabled")
+
+        # Validate endpoint URL format
+        if not self.endpoint or not self.endpoint.strip():
+            raise ValueError("VLM endpoint URL cannot be empty when VLM is enabled")
+
+        # Validate endpoint starts with http:// or https://
+        if not self.endpoint.startswith(("http://", "https://")):
+            raise ValueError(
+                f"VLM endpoint must start with http:// or https://, got: {self.endpoint}"
+            )
+
 
 class SecurityConfig(BaseModel):
     """Security configuration."""
