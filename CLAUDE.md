@@ -112,7 +112,7 @@ Server configuration lives at `~/.gaming-agent/config.json`:
 |----------|-------|
 | **Screen** | `screenshot`, `get_screen_size`, `analyze_screen` |
 | **Mouse** | `click`, `double_click`, `move_to`, `drag_to`, `scroll`, `get_mouse_position` |
-| **Keyboard** | `type_text`, `press_key`, `hotkey` |
+| **Keyboard** | `type_text` (with `use_paste` for fast input), `press_key`, `hotkey` |
 | **File** | `read_file`, `write_file`, `list_files`, `upload_file`, `download_file` |
 | **System** | `execute_command`, `get_system_info`, `list_windows`, `focus_window` |
 | **Workflow** | `run_workflow`, `demo_terminal_workflow` |
@@ -157,7 +157,7 @@ The platform includes two new workflow tools for executing sequences of actions:
 A ready-made workflow that:
 1. Detects platform and terminal
 2. Opens a new terminal window
-3. Types the provided text
+3. Types the provided text (uses fast paste input by default for speed)
 4. Presses Enter to execute
 5. Captures screenshot
 6. Closes the terminal
@@ -182,7 +182,7 @@ A generic workflow executor that chains multiple actions:
 
 **Perfect for:** Complex automation sequences, batch operations.
 
-**Example:**
+**Example with character-by-character typing:**
 ```json
 {
   "tool": "run_workflow",
@@ -207,6 +207,78 @@ A generic workflow executor that chains multiple actions:
         "args": {}
       }
     ]
+  }
+}
+```
+
+**Example with fast paste input (recommended for long text):**
+```json
+{
+  "tool": "run_workflow",
+  "args": {
+    "steps": [
+      {
+        "tool": "execute_command",
+        "args": { "command": "gnome-terminal" },
+        "wait_ms": 1500
+      },
+      {
+        "tool": "type_text",
+        "args": { "text": "echo 'Long text here' && python script.py", "use_paste": true },
+        "wait_ms": 200
+      },
+      {
+        "tool": "press_key",
+        "args": { "key": "enter" }
+      },
+      {
+        "tool": "screenshot",
+        "args": {}
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Fast Text Input with `use_paste` Parameter
+
+The `type_text` tool now supports a `use_paste` parameter for significantly faster text input, especially useful for long strings or commands:
+
+### How It Works
+- **`use_paste=True`:** Copies text to clipboard and pastes using Ctrl+V (Linux/Windows) or Cmd+V (macOS)
+  - ⚡ **Much faster** for long text (especially important for automation)
+  - ✓ **Platform-aware** (automatically uses correct hotkey)
+  - ✓ **Clipboard-safe** (saves and restores original clipboard content)
+
+- **`use_paste=False` (default):** Character-by-character typing via pyautogui
+  - ✓ Works in all applications (including games)
+  - Can be slow for long text strings
+  - Controllable via `interval` parameter for game input
+
+### Use Cases
+- **Terminal commands:** Use `use_paste=True` for faster script input
+- **Form filling:** Use `use_paste=True` for long text entries
+- **Game input:** Use `use_paste=False` (default) for realistic character-by-character input
+- **Credentials:** Consider security implications when pasting sensitive data
+
+### Example: Fast Terminal Input
+```python
+# Slow (character-by-character)
+type_text("python train_model.py --epochs 100 --lr 0.001")
+
+# Fast (clipboard paste)
+type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
+```
+
+### In Workflows
+```json
+{
+  "tool": "type_text",
+  "args": {
+    "text": "long command here",
+    "use_paste": true
   }
 }
 ```
@@ -276,6 +348,7 @@ uv run ruff check src tests
 - **Lazy Imports:** GUI modules (pyautogui, PIL) use lazy imports to avoid breaking CI
 - **VLM Optional:** `analyze_screen` returns error if Ollama not configured
 - **Workflow Engine:** All tools must be callable from `_get_tool_handler()` in `workflow.py`
+- **Fast Text Input:** Use `type_text(..., use_paste=True)` for clipboard-based fast input when typing long strings or commands
 
 ---
 
