@@ -1,12 +1,13 @@
 """MCP Tools for AI Gaming Agent.
 
 Tools are organized into modules:
-- screen: screenshot, get_screen_size, analyze_screen
+- screen: screenshot, get_screen_size
 - mouse: click, double_click, move_to, drag_to, scroll, get_mouse_position
 - keyboard: type_text, press_key, hotkey
 - files: read_file, write_file, list_files, upload_file, download_file
 - system: execute_command, get_system_info, list_windows, focus_window
 - workflow: run_workflow, demo_terminal_workflow (composite tools for multi-step automation)
+- vlm: analyze_screen (vision language model analysis)
 
 Import tools directly from submodules to avoid GUI dependency issues:
     from ai_gaming_agent.tools.files import read_file
@@ -43,6 +44,8 @@ __all__ = [
     # Workflow
     "run_workflow",
     "demo_terminal_workflow",
+    # VLM
+    "analyze_screen",
 ]
 
 _MODULE_MAP = {
@@ -69,6 +72,8 @@ _MODULE_MAP = {
     # Workflow
     "run_workflow": "workflow",
     "demo_terminal_workflow": "workflow",
+    # VLM
+    "analyze_screen": "vlm",
 }
 
 
