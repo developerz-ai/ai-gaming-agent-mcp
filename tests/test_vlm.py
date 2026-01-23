@@ -1,14 +1,11 @@
 """Tests for VLM (Vision Language Model) tools."""
 
 import base64
-import sys
 from unittest.mock import MagicMock, patch
-
-import ollama
 
 
 class TestAnalyzeScreen:
-    """Tests for the analyze_screen function."""
+    """Tests for analyze_screen function."""
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
     def test_vlm_disabled_returns_error(self, mock_get_config):
@@ -23,188 +20,331 @@ class TestAnalyzeScreen:
         result = analyze_screen(prompt="What do you see?")
 
         assert result["success"] is False
-        assert "not enabled" in result["error"].lower()
+        assert "VLM is not enabled" in result["error"]
+        assert "vlm.enabled=true" in result["error"]
         assert result["prompt"] == "What do you see?"
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_unsupported_provider_returns_error(self, mock_get_config):
-        """Test that unsupported VLM provider returns error."""
-        from ai_gaming_agent.tools.vlm import analyze_screen
-
-        # Mock config with unsupported provider
-        mock_config = MagicMock()
-        mock_config.vlm.enabled = True
-        mock_config.vlm.provider = "unsupported_provider"
-        mock_get_config.return_value = mock_config
-
-        # Create a mock screen module with screenshot function
-        mock_screen_module = MagicMock()
-        mock_screen_module.screenshot = MagicMock(return_value={
-            "success": True,
-            "image": base64.b64encode(b"fake image data").decode(),
-        })
-
-        # Patch the import
-        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen_module}):
-            result = analyze_screen(prompt="What do you see?")
-
-        assert result["success"] is False
-        assert "unsupported" in result["error"].lower()
-        assert "unsupported_provider" in result["error"]
-
-    @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_screenshot_failure_returns_error(self, mock_get_config):
-        """Test that screenshot failure is handled properly."""
-        from ai_gaming_agent.tools.vlm import analyze_screen
-
-        # Mock config with VLM enabled
-        mock_config = MagicMock()
-        mock_config.vlm.enabled = True
-        mock_config.vlm.provider = "ollama"
-        mock_get_config.return_value = mock_config
-
-        # Create a mock screen module with failing screenshot
-        mock_screen_module = MagicMock()
-        mock_screen_module.screenshot = MagicMock(return_value={
+    def test_screenshot_failure_propagates(self, mock_get_config):
+        """Test that screenshot failures are properly handled."""
+        # Mock screenshot function before importing
+        mock_screen = MagicMock()
+        mock_screen.screenshot = MagicMock(return_value={
             "success": False,
             "error": "No display available",
         })
 
-        # Patch the import
-        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen_module}):
-            result = analyze_screen(prompt="What do you see?")
+        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen}):
+            from ai_gaming_agent.tools.vlm import analyze_screen
+
+            # Mock config with VLM enabled
+            mock_config = MagicMock()
+            mock_config.vlm.enabled = True
+            mock_config.vlm.provider = "ollama"
+            mock_config.vlm.model = "qwen2.5-vl:3b"
+            mock_config.vlm.endpoint = "http://localhost:11434"
+            mock_get_config.return_value = mock_config
+
+            result = analyze_screen(prompt="Describe the screen")
 
         assert result["success"] is False
-        assert "screenshot" in result["error"].lower()
+        assert "Failed to capture screenshot" in result["error"]
         assert "No display available" in result["error"]
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_ollama_import_error(self, mock_get_config):
-        """Test handling when ollama package is not installed."""
-        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+    def test_screenshot_exception_handled(self, mock_get_config):
+        """Test that exceptions during screenshot capture are handled."""
+        # Mock screenshot to raise exception
+        mock_screen = MagicMock()
+        mock_screen.screenshot = MagicMock(side_effect=RuntimeError("Display connection failed"))
 
-        # Simulate ollama not being installed
-        with patch.dict("sys.modules", {"ollama": None}):
-            # Need to reload the function to trigger ImportError
-            result = _analyze_with_ollama(
-                prompt="What do you see?",
-                image_b64=base64.b64encode(b"fake").decode(),
-                model="qwen2.5-vl:3b",
-                endpoint="http://localhost:11434",
-            )
+        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen}):
+            from ai_gaming_agent.tools.vlm import analyze_screen
 
-        # The function handles ImportError gracefully
+            mock_config = MagicMock()
+            mock_config.vlm.enabled = True
+            mock_config.vlm.provider = "ollama"
+            mock_config.vlm.model = "qwen2.5-vl:3b"
+            mock_config.vlm.endpoint = "http://localhost:11434"
+            mock_get_config.return_value = mock_config
+
+            result = analyze_screen(prompt="What's on screen?")
+
         assert result["success"] is False
-        assert "ollama" in result["error"].lower() or "not installed" in result["error"].lower()
+        assert "Screenshot capture failed" in result["error"]
+        assert "Display connection failed" in result["error"]
 
-    @patch("ollama.Client")
     @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_successful_analysis(self, mock_get_config, mock_ollama_client):
-        """Test successful screen analysis with mocked Ollama."""
-        from ai_gaming_agent.tools.vlm import analyze_screen
+    def test_unsupported_provider_returns_error(self, mock_get_config):
+        """Test that unsupported VLM providers return an error."""
+        # Mock screenshot
+        mock_screen = MagicMock()
+        mock_screen.screenshot = MagicMock(return_value={"success": True, "image": "base64imagedata"})
 
-        # Mock config
-        mock_config = MagicMock()
-        mock_config.vlm.enabled = True
-        mock_config.vlm.provider = "ollama"
-        mock_config.vlm.model = "qwen2.5-vl:3b"
-        mock_config.vlm.endpoint = "http://localhost:11434"
-        mock_get_config.return_value = mock_config
+        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen}):
+            from ai_gaming_agent.tools.vlm import analyze_screen
+
+            # Create config and bypass validation
+            mock_config = MagicMock()
+            mock_config.vlm.enabled = True
+            mock_config.vlm.provider = "unsupported_provider"
+            mock_get_config.return_value = mock_config
+
+            result = analyze_screen(prompt="Test prompt")
+
+        assert result["success"] is False
+        assert "Unsupported VLM provider" in result["error"]
+        assert "unsupported_provider" in result["error"]
+
+    @patch("ai_gaming_agent.tools.vlm.get_config")
+    def test_successful_analysis_with_ollama(self, mock_get_config):
+        """Test successful screen analysis with Ollama."""
+        # Mock screenshot with valid base64 data
+        mock_screen = MagicMock()
+        mock_screen.screenshot = MagicMock(return_value={"success": True, "image": "dGVzdA=="})
 
         # Mock Ollama client
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.return_value = {
-            "message": {
-                "content": "I see a game menu with three buttons: Start, Options, and Quit."
-            }
-        }
-        mock_ollama_client.return_value = mock_client_instance
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": "I see a desktop with a terminal window"}}
 
-        # Create a mock screen module
-        fake_image = base64.b64encode(b"fake PNG image data").decode()
-        mock_screen_module = MagicMock()
-        mock_screen_module.screenshot = MagicMock(return_value={
-            "success": True,
-            "image": fake_image,
-            "width": 1920,
-            "height": 1080,
-        })
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
 
-        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen_module}):
-            result = analyze_screen(prompt="What buttons are visible?")
+        with patch.dict("sys.modules", {
+            "ai_gaming_agent.tools.screen": mock_screen,
+            "ollama": mock_ollama
+        }):
+            from ai_gaming_agent.tools.vlm import analyze_screen
 
-        assert result["success"] is True
-        assert "game menu" in result["response"].lower()
-        assert result["prompt"] == "What buttons are visible?"
-        assert result["model"] == "qwen2.5-vl:3b"
+            mock_config = MagicMock()
+            mock_config.vlm.enabled = True
+            mock_config.vlm.provider = "ollama"
+            mock_config.vlm.model = "qwen2.5-vl:3b"
+            mock_config.vlm.endpoint = "http://localhost:11434"
+            mock_get_config.return_value = mock_config
 
-        # Verify Ollama was called correctly
-        mock_ollama_client.assert_called_once_with(host="http://localhost:11434")
-        mock_client_instance.chat.assert_called_once()
-
-    @patch("ollama.Client")
-    @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_empty_response_returns_error(self, mock_get_config, mock_ollama_client):
-        """Test that empty VLM response is handled as error."""
-        from ai_gaming_agent.tools.vlm import analyze_screen
-
-        # Mock config
-        mock_config = MagicMock()
-        mock_config.vlm.enabled = True
-        mock_config.vlm.provider = "ollama"
-        mock_config.vlm.model = "qwen2.5-vl:3b"
-        mock_config.vlm.endpoint = "http://localhost:11434"
-        mock_get_config.return_value = mock_config
-
-        # Mock Ollama client to return empty response
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.return_value = {"message": {"content": ""}}
-        mock_ollama_client.return_value = mock_client_instance
-
-        # Create a mock screen module
-        mock_screen_module = MagicMock()
-        mock_screen_module.screenshot = MagicMock(return_value={
-            "success": True,
-            "image": base64.b64encode(b"fake").decode(),
-        })
-
-        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen_module}):
             result = analyze_screen(prompt="What do you see?")
 
-        assert result["success"] is False
-        assert "empty" in result["error"].lower()
+        assert result["success"] is True
+        assert result["response"] == "I see a desktop with a terminal window"
+        assert result["prompt"] == "What do you see?"
+        assert result["model"] == "qwen2.5-vl:3b"
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_connection_error_handling(self, mock_get_config):
-        """Test that connection errors are handled with helpful message."""
+    def test_monitor_parameter_passed_to_screenshot(self, mock_get_config):
+        """Test that monitor parameter is passed to screenshot function."""
+        # Mock screenshot with valid base64 data
+        mock_screen = MagicMock()
+        mock_screen.screenshot = MagicMock(return_value={"success": True, "image": "dGVzdA=="})
+
+        # Mock Ollama
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": "Test response"}}
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {
+            "ai_gaming_agent.tools.screen": mock_screen,
+            "ollama": mock_ollama
+        }):
+            from ai_gaming_agent.tools.vlm import analyze_screen
+
+            mock_config = MagicMock()
+            mock_config.vlm.enabled = True
+            mock_config.vlm.provider = "ollama"
+            mock_config.vlm.model = "qwen2.5-vl:3b"
+            mock_config.vlm.endpoint = "http://localhost:11434"
+            mock_get_config.return_value = mock_config
+
+            analyze_screen(prompt="Test", monitor=2)
+
+            # Verify screenshot was called with monitor=2
+            mock_screen.screenshot.assert_called_once_with(monitor=2)
+
+
+class TestAnalyzeWithOllama:
+    """Tests for _analyze_with_ollama function."""
+
+    def test_ollama_not_installed_returns_error(self):
+        """Test that missing Ollama package returns helpful error."""
+        # Make ollama import fail
+        import builtins
+
         from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+        original_import = builtins.__import__
 
-        # Mock config
-        mock_config = MagicMock()
-        mock_config.vlm.enabled = True
-        mock_config.vlm.provider = "ollama"
-        mock_config.vlm.model = "qwen2.5-vl:3b"
-        mock_config.vlm.endpoint = "http://localhost:11434"
-        mock_get_config.return_value = mock_config
+        def mock_import(name, *args, **kwargs):
+            if name == "ollama":
+                raise ImportError("No module named 'ollama'")
+            return original_import(name, *args, **kwargs)
 
-        # Mock Ollama to raise connection error
-        with patch("ollama.Client") as mock_client:
-            mock_client.side_effect = Exception("Connection refused")
-
+        with patch("builtins.__import__", side_effect=mock_import):
             result = _analyze_with_ollama(
-                prompt="What do you see?",
-                image_b64=base64.b64encode(b"fake").decode(),
+                prompt="Test",
+                image_b64="dGVzdA==",  # "test" in base64
                 model="qwen2.5-vl:3b",
                 endpoint="http://localhost:11434",
             )
 
         assert result["success"] is False
-        # The error message contains "connect" in "Cannot connect to Ollama"
-        assert "connect" in result["error"].lower()
+        assert "Ollama Python client not installed" in result["error"]
+        assert "pip install" in result["error"]
+
+    def test_successful_ollama_analysis(self):
+        """Test successful analysis with Ollama."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        # Mock Ollama client
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": "The image shows a health bar at 75%"}}
+
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="What is the health percentage?",
+                image_b64="dGVzdA==",  # "test" in base64
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is True
+        assert result["response"] == "The image shows a health bar at 75%"
+        assert result["model"] == "qwen2.5-vl:3b"
+        assert result["prompt"] == "What is the health percentage?"
+
+    def test_ollama_empty_response(self):
+        """Test handling of empty response from Ollama."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": ""}}
+
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="Test",
+                image_b64="dGVzdA==",
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is False
+        assert "empty response" in result["error"]
+
+    def test_ollama_model_not_found(self):
+        """Test helpful error message when model is not found."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        # Create a mock ResponseError that properly inherits from Exception
+        class MockResponseError(Exception):
+            pass
+
+        mock_client = MagicMock()
+        mock_client.chat.side_effect = MockResponseError("model not found")
+
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+        mock_ollama.ResponseError = MockResponseError
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="Test",
+                image_b64="dGVzdA==",
+                model="nonexistent-model",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is False
+        assert "Model 'nonexistent-model' not found" in result["error"]
+        assert "ollama pull" in result["error"]
+
+    def test_ollama_connection_refused(self):
+        """Test connection error handling."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        # Create mock that raises on Client instantiation
+        mock_ollama = MagicMock()
+        mock_ollama.Client.side_effect = Exception("connection refused")
+        mock_ollama.ResponseError = type("ResponseError", (Exception,), {})
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="Test",
+                image_b64="dGVzdA==",
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is False
+        assert "Cannot connect to Ollama" in result["error"]
+        assert "ollama serve" in result["error"]
+
+    def test_ollama_generic_error(self):
+        """Test generic error handling."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        # Create mock with different exception type
+        class CustomError(Exception):
+            pass
+
+        mock_client = MagicMock()
+        mock_client.chat.side_effect = CustomError("Unexpected error")
+
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+        mock_ollama.ResponseError = type("ResponseError", (Exception,), {})
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="Test",
+                image_b64="dGVzdA==",
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is False
+        assert "VLM analysis failed" in result["error"]
+        assert "Unexpected error" in result["error"]
+
+    def test_ollama_base64_decoding(self):
+        """Test that base64 image is properly decoded and sent to Ollama."""
+        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
+        # Create a simple test image data
+        test_image_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        test_image_b64 = base64.b64encode(test_image_data).decode()
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": "Analysis result"}}
+
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = _analyze_with_ollama(
+                prompt="Analyze",
+                image_b64=test_image_b64,
+                model="qwen2.5-vl:3b",
+                endpoint="http://localhost:11434",
+            )
+
+        assert result["success"] is True
+
+        # Verify the chat call received bytes
+        call_args = mock_client.chat.call_args
+        messages = call_args[1]["messages"]
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Analyze"
+        assert messages[0]["images"] == [test_image_data]
 
 
 class TestAnalyzeImage:
-    """Tests for the analyze_image function."""
+    """Tests for analyze_image function (direct image analysis)."""
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
     def test_vlm_disabled_returns_error(self, mock_get_config):
@@ -215,92 +355,49 @@ class TestAnalyzeImage:
         mock_config.vlm.enabled = False
         mock_get_config.return_value = mock_config
 
-        result = analyze_image(
-            image_b64=base64.b64encode(b"fake").decode(),
-            prompt="What do you see?",
-        )
+        result = analyze_image(image_b64="dGVzdA==", prompt="What do you see?")
 
         assert result["success"] is False
-        assert "not enabled" in result["error"].lower()
+        assert "VLM is not enabled" in result["error"]
 
-    @patch("ollama.Client")
     @patch("ai_gaming_agent.tools.vlm.get_config")
-    def test_successful_image_analysis(self, mock_get_config, mock_ollama_client):
-        """Test successful image analysis with provided image."""
+    def test_unsupported_provider(self, mock_get_config):
+        """Test that unsupported provider returns error."""
         from ai_gaming_agent.tools.vlm import analyze_image
 
-        # Mock config
+        mock_config = MagicMock()
+        mock_config.vlm.enabled = True
+        mock_config.vlm.provider = "unsupported"
+        mock_get_config.return_value = mock_config
+
+        result = analyze_image(image_b64="dGVzdA==", prompt="Test")
+
+        assert result["success"] is False
+        assert "Unsupported VLM provider" in result["error"]
+
+    @patch("ai_gaming_agent.tools.vlm.get_config")
+    def test_successful_analysis(self, mock_get_config):
+        """Test successful image analysis."""
+        from ai_gaming_agent.tools.vlm import analyze_image
+
         mock_config = MagicMock()
         mock_config.vlm.enabled = True
         mock_config.vlm.provider = "ollama"
-        mock_config.vlm.model = "llava:13b"
+        mock_config.vlm.model = "qwen2.5-vl:3b"
         mock_config.vlm.endpoint = "http://localhost:11434"
         mock_get_config.return_value = mock_config
 
         # Mock Ollama client
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.return_value = {
-            "message": {"content": "This is a screenshot of a desktop."}
-        }
-        mock_ollama_client.return_value = mock_client_instance
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": "A red apple on a table"}}
 
-        result = analyze_image(
-            image_b64=base64.b64encode(b"fake PNG data").decode(),
-            prompt="Describe this image",
-        )
+        mock_ollama = MagicMock()
+        mock_ollama.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {"ollama": mock_ollama}):
+            result = analyze_image(image_b64="dGVzdA==", prompt="What fruit is in the image?")
 
         assert result["success"] is True
-        assert "desktop" in result["response"].lower()
-        assert result["model"] == "llava:13b"
-
-
-class TestAnalyzeWithOllama:
-    """Tests for the internal _analyze_with_ollama function."""
-
-    def test_ollama_not_installed(self):
-        """Test behavior when ollama package is not available."""
-        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
-
-        # Mock ollama import to fail
-        original_modules = sys.modules.copy()
-
-        # Remove ollama from modules if present
-        if "ollama" in sys.modules:
-            del sys.modules["ollama"]
-
-        # The function should handle this gracefully
-        # Note: This test verifies the error message when ollama can't be imported
-        result = _analyze_with_ollama(
-            prompt="test",
-            image_b64=base64.b64encode(b"test").decode(),
-            model="test",
-            endpoint="http://localhost:11434",
-        )
-
-        # Restore modules
-        sys.modules.update(original_modules)
-
-        # If ollama is actually installed in the test environment, the test will pass
-        # If not, we should see the import error
-        assert "success" in result
-
-    @patch("ollama.Client")
-    def test_model_not_found_error(self, mock_ollama_client):
-        """Test helpful error message when model is not pulled."""
-        from ai_gaming_agent.tools.vlm import _analyze_with_ollama
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.side_effect = ollama.ResponseError("model 'qwen2.5-vl:3b' not found")
-        mock_ollama_client.return_value = mock_client_instance
-
-        result = _analyze_with_ollama(
-            prompt="test",
-            image_b64=base64.b64encode(b"test").decode(),
-            model="qwen2.5-vl:3b",
-            endpoint="http://localhost:11434",
-        )
-
-        assert result["success"] is False
-        assert "not found" in result["error"].lower()
-        # Should suggest pulling the model
-        assert "pull" in result["error"].lower()
+        assert result["response"] == "A red apple on a table"
+        assert result["prompt"] == "What fruit is in the image?"
+        assert result["model"] == "qwen2.5-vl:3b"
