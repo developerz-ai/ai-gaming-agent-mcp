@@ -177,9 +177,7 @@ def _analyze_with_ollama(
         error_msg = str(e)
         # Provide helpful messages for common errors
         if "model" in error_msg.lower() and "not found" in error_msg.lower():
-            error_msg = (
-                f"Model '{model}' not found. Pull it first with: ollama pull {model}"
-            )
+            error_msg = f"Model '{model}' not found. Pull it first with: ollama pull {model}"
         return {
             "success": False,
             "error": f"Ollama API error: {error_msg}",
@@ -192,10 +190,7 @@ def _analyze_with_ollama(
         if "connection" in error_str or "refused" in error_str:
             return {
                 "success": False,
-                "error": (
-                    f"Cannot connect to Ollama at {endpoint}. "
-                    "Ensure Ollama is running: ollama serve"
-                ),
+                "error": (f"Cannot connect to Ollama at {endpoint}. Ensure Ollama is running: ollama serve"),
                 "prompt": prompt,
                 "model": model,
             }

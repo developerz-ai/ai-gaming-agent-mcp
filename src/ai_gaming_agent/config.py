@@ -35,8 +35,7 @@ class VLMConfig(BaseModel):
         supported_providers = ["ollama"]
         if self.provider not in supported_providers:
             raise ValueError(
-                f"Unsupported VLM provider: {self.provider}. "
-                f"Supported providers: {', '.join(supported_providers)}"
+                f"Unsupported VLM provider: {self.provider}. Supported providers: {', '.join(supported_providers)}"
             )
 
         # Validate model name is not empty
@@ -49,9 +48,7 @@ class VLMConfig(BaseModel):
 
         # Validate endpoint starts with http:// or https://
         if not self.endpoint.startswith(("http://", "https://")):
-            raise ValueError(
-                f"VLM endpoint must start with http:// or https://, got: {self.endpoint}"
-            )
+            raise ValueError(f"VLM endpoint must start with http:// or https://, got: {self.endpoint}")
 
 
 class SecurityConfig(BaseModel):

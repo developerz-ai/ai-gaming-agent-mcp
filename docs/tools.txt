@@ -160,6 +160,57 @@ focus_window
   Returns: Success or failure status
 
 
+WORKFLOW TOOLS
+--------------
+
+run_workflow
+  Description: Execute a sequence of tool actions as a single workflow
+  Parameters:
+    steps - List of step dictionaries, each containing:
+      - tool (str, required) - Name of the tool to call
+      - args (dict, optional) - Arguments to pass to the tool
+      - wait_ms (int, optional) - Milliseconds to wait after this step
+      - description (str, optional) - Human-readable step description
+      - continue_on_error (bool, optional) - Continue if this step fails
+  Returns: Dictionary with:
+    - success - True if all steps succeeded
+    - total_steps - Number of steps in workflow
+    - completed_steps - Number of steps that completed
+    - failed_step - Index of first failed step (if any)
+    - results - List of results from each step
+    - total_time_ms - Total execution time
+    - error - Error message if workflow failed
+  Example:
+    steps = [
+      {"tool": "execute_command", "args": {"command": "gnome-terminal"}, "wait_ms": 1000},
+      {"tool": "type_text", "args": {"text": "echo hello"}, "wait_ms": 100},
+      {"tool": "press_key", "args": {"key": "enter"}}
+    ]
+
+demo_terminal_workflow
+  Description: Complete terminal workflow - open, type, execute, capture, close
+  Parameters:
+    text (optional) - Text/command to type (default: "echo hello world")
+    terminal_wait_ms (optional) - Wait time for terminal to open (default: 2000)
+    post_type_wait_ms (optional) - Wait time after typing (default: 500)
+    post_enter_wait_ms (optional) - Wait time after pressing Enter (default: 1000)
+    capture_screenshot (optional) - Take screenshot after execution (default: true)
+    close_terminal (optional) - Close terminal at the end (default: true)
+  Returns: Dictionary with:
+    - success - True if all steps completed
+    - terminal_command - Terminal application used
+    - platform - Operating system
+    - text_typed - The text that was typed
+    - screenshot - Screenshot result (if captured)
+    - steps_completed - List of completed step names
+    - total_time_ms - Total execution time
+    - error - Error message if any step failed
+  Notes:
+    - Auto-detects appropriate terminal for platform (Linux/macOS/Windows)
+    - Complete automation example in a single call
+    - Useful for testing and demonstrations
+
+
 EXPOSED RESOURCES
 -----------------
 Resources can be accessed by URI:

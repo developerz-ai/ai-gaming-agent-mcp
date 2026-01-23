@@ -29,10 +29,12 @@ class TestAnalyzeScreen:
         """Test that screenshot failures are properly handled."""
         # Mock screenshot function before importing
         mock_screen = MagicMock()
-        mock_screen.screenshot = MagicMock(return_value={
-            "success": False,
-            "error": "No display available",
-        })
+        mock_screen.screenshot = MagicMock(
+            return_value={
+                "success": False,
+                "error": "No display available",
+            }
+        )
 
         with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen}):
             from ai_gaming_agent.tools.vlm import analyze_screen
@@ -110,10 +112,7 @@ class TestAnalyzeScreen:
         mock_ollama = MagicMock()
         mock_ollama.Client.return_value = mock_client
 
-        with patch.dict("sys.modules", {
-            "ai_gaming_agent.tools.screen": mock_screen,
-            "ollama": mock_ollama
-        }):
+        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen, "ollama": mock_ollama}):
             from ai_gaming_agent.tools.vlm import analyze_screen
 
             mock_config = MagicMock()
@@ -143,10 +142,7 @@ class TestAnalyzeScreen:
         mock_ollama = MagicMock()
         mock_ollama.Client.return_value = mock_client
 
-        with patch.dict("sys.modules", {
-            "ai_gaming_agent.tools.screen": mock_screen,
-            "ollama": mock_ollama
-        }):
+        with patch.dict("sys.modules", {"ai_gaming_agent.tools.screen": mock_screen, "ollama": mock_ollama}):
             from ai_gaming_agent.tools.vlm import analyze_screen
 
             mock_config = MagicMock()
@@ -171,6 +167,7 @@ class TestAnalyzeWithOllama:
         import builtins
 
         from ai_gaming_agent.tools.vlm import _analyze_with_ollama
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
