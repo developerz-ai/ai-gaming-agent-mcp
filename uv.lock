@@ -14,6 +14,7 @@ dependencies = [
     { name = "pyautogui" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pyperclip" },
     { name = "screeninfo" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -42,6 +43,7 @@ requires-dist = [
     { name = "pyautogui", specifier = ">=0.9.54" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "pyperclip", specifier = ">=1.8.0" },
     { name = "pytesseract", marker = "extra == 'integration'", specifier = ">=0.3.10" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest", marker = "extra == 'integration'", specifier = ">=8.0.0" },

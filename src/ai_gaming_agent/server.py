@@ -110,12 +110,20 @@ TOOL_DEFINITIONS = [
     # Keyboard tools
     Tool(
         name="type_text",
-        description="Type a string of text.",
+        description="Type a string of text. Supports fast input via clipboard paste.",
         inputSchema={
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Text to type"},
-                "interval": {"type": "number", "description": "Delay between keystrokes in seconds"},
+                "interval": {
+                    "type": "number",
+                    "description": "Delay between keystrokes in seconds (ignored if use_paste=True)",
+                },
+                "use_paste": {
+                    "type": "boolean",
+                    "description": "Use clipboard paste for faster input (copies to clipboard and pastes)",
+                    "default": False,
+                },
             },
             "required": ["text"],
         },
