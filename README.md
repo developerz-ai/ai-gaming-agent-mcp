@@ -135,9 +135,35 @@ This will:
 ### Keyboard Tools
 | Tool | Description |
 |------|-------------|
-| `type_text` | Type a string of text |
+| `type_text` | Type a string of text (supports fast paste mode via clipboard) |
 | `press_key` | Press a single key |
 | `hotkey` | Press key combination |
+
+#### Fast Text Input with Paste
+The `type_text` tool supports **fast clipboard-based paste** mode for significantly faster text input:
+
+```json
+{
+  "tool": "type_text",
+  "args": {
+    "text": "long command or text here",
+    "use_paste": true
+  }
+}
+```
+
+**Benefits:**
+- **10x faster** than character-by-character typing for long text
+- **Ideal for**: Pasting long commands, scripts, credentials
+- **How it works**: Copies text to clipboard, then uses Ctrl+V (Linux/Windows) or Cmd+V (macOS) to paste
+- **Default**: `use_paste=false` (uses character-by-character typing)
+
+**When to use:**
+- ✓ Large blocks of text
+- ✓ Complex commands with special characters
+- ✓ When speed matters more than realtime character visibility
+- ✗ Games that don't support paste input
+- ✗ When character-by-character input is explicitly required
 
 ### File Tools
 | Tool | Description |
