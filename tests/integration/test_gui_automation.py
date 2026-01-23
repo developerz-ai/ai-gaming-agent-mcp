@@ -346,6 +346,232 @@ class TestTerminalAutomation:
             raise e
 
 
+class TestPasteBasedInput:
+    """Tests for paste-based fast text input."""
+
+    def _get_terminal_command(self):
+        """Get platform-specific terminal command."""
+        system = platform.system()
+        if system == "Linux":
+            # Try common Linux terminals
+            terminals = ["gnome-terminal", "konsole", "xterm", "xfce4-terminal"]
+            for term in terminals:
+                try:
+                    subprocess.run(["which", term], check=True, capture_output=True)
+                    return term
+                except subprocess.CalledProcessError:
+                    continue
+            return None
+        elif system == "Darwin":
+            return "open -a Terminal"
+        elif system == "Windows":
+            return "cmd"
+        return None
+
+    def test_paste_text_basic(self, ensure_gui):
+        """Test basic paste functionality with use_paste=True."""
+        from ai_gaming_agent.tools.keyboard import type_text
+
+        # Test with a simple string
+        result = type_text("hello world", use_paste=True)
+
+        assert result["success"] is True
+        assert result["text"] == "hello world"
+        assert result["method"] == "paste"
+
+    def test_paste_vs_type_method(self, ensure_gui):
+        """Test that method field correctly reflects use_paste parameter."""
+        from ai_gaming_agent.tools.keyboard import type_text
+
+        # Test with use_paste=False (default)
+        result_type = type_text("test", interval=0.01)
+        assert result_type["success"] is True
+        assert result_type["method"] == "type"
+
+        # Test with use_paste=True
+        result_paste = type_text("test", use_paste=True)
+        assert result_paste["success"] is True
+        assert result_paste["method"] == "paste"
+
+    def test_paste_special_characters(self, ensure_gui):
+        """Test paste handles special characters that would fail with pyautogui.write()."""
+        from ai_gaming_agent.tools.keyboard import type_text
+
+        # These characters often fail with pyautogui.write() but work with paste
+        special_text = "café résumé naïve 日本語 🎮"
+        result = type_text(special_text, use_paste=True)
+
+        assert result["success"] is True
+        assert result["text"] == special_text
+        assert result["method"] == "paste"
+
+    def test_paste_long_text(self, ensure_gui):
+        """Test paste is more efficient for long text."""
+        import time as time_module
+
+        from ai_gaming_agent.tools.keyboard import type_text
+
+        long_text = "This is a longer piece of text that would take a while to type " * 5
+
+        # Time the paste method
+        start_paste = time_module.time()
+        result_paste = type_text(long_text, use_paste=True)
+        paste_duration = time_module.time() - start_paste
+
+        assert result_paste["success"] is True
+        assert result_paste["method"] == "paste"
+
+        # Paste should be nearly instantaneous (< 1 second)
+        print(f"Paste duration for {len(long_text)} chars: {paste_duration:.3f}s")
+        assert paste_duration < 1.0, f"Paste took too long: {paste_duration}s"
+
+    def test_paste_terminal_workflow(self, ensure_gui):
+        """
+        Full integration test: open terminal, paste command using fast input, verify.
+
+        This tests the real-world use case of using paste for fast game commands.
+        """
+        from ai_gaming_agent.tools.keyboard import hotkey, press_key, type_text
+        from ai_gaming_agent.tools.screen import screenshot
+
+        terminal_cmd = self._get_terminal_command()
+        if not terminal_cmd:
+            pytest.skip("No supported terminal found")
+
+        try:
+            # Open terminal
+            print(f"Opening terminal: {terminal_cmd}")
+            if platform.system() == "Linux":
+                subprocess.Popen([terminal_cmd])
+            else:
+                subprocess.Popen(terminal_cmd, shell=True)
+
+            time.sleep(2)  # Wait for terminal to open
+
+            # Use paste-based fast input to type a command
+            print("Using paste to input command...")
+            result = type_text('echo "Fast paste input works!"', use_paste=True)
+            assert result["success"] is True
+            assert result["method"] == "paste"
+
+            time.sleep(0.3)
+
+            # Press Enter to execute
+            press_key("enter")
+            time.sleep(1)
+
+            # Take screenshot to verify
+            print("Taking screenshot...")
+            shot = screenshot()
+            assert shot["success"] is True
+            print(f"Screenshot captured: {shot['width']}x{shot['height']}")
+
+            # Close terminal
+            print("Closing terminal...")
+            if platform.system() == "Darwin":
+                hotkey(["cmd", "q"])
+            else:
+                hotkey(["alt", "f4"])
+
+            time.sleep(0.5)
+            print("Paste terminal workflow completed successfully!")
+
+        except Exception as e:
+            # Try to close terminal on error
+            try:
+                if platform.system() == "Darwin":
+                    hotkey(["cmd", "q"])
+                else:
+                    hotkey(["alt", "f4"])
+            except Exception:
+                pass
+            raise e
+
+    def test_paste_terminal_with_ocr_verification(self, ensure_gui):
+        """
+        Full integration test with OCR verification of paste-based input.
+
+        This test verifies that paste-based input actually produces the expected
+        output in the terminal, using OCR to read the screen.
+        """
+        try:
+            import pytesseract
+
+            pytesseract.get_tesseract_version()
+        except Exception as e:
+            pytest.skip(f"Tesseract not available: {e}")
+
+        import base64
+        import io
+        import uuid
+
+        from PIL import Image
+
+        from ai_gaming_agent.tools.keyboard import hotkey, press_key, type_text
+        from ai_gaming_agent.tools.screen import screenshot
+
+        terminal_cmd = self._get_terminal_command()
+        if not terminal_cmd:
+            pytest.skip("No supported terminal found")
+
+        # Generate unique string to verify paste worked
+        unique_id = str(uuid.uuid4())[:8]
+        expected_text = f"PASTE_TEST_{unique_id}"
+
+        try:
+            # Open terminal
+            if platform.system() == "Linux":
+                subprocess.Popen([terminal_cmd])
+            else:
+                subprocess.Popen(terminal_cmd, shell=True)
+            time.sleep(2)
+
+            # Use paste to input command with unique output
+            print(f"Using paste to input: echo \"{expected_text}\"")
+            result = type_text(f'echo "{expected_text}"', use_paste=True)
+            assert result["success"] is True
+            assert result["method"] == "paste"
+
+            time.sleep(0.3)
+            press_key("enter")
+            time.sleep(1)
+
+            # Take screenshot and OCR
+            shot = screenshot()
+            assert shot["success"] is True
+
+            image_data = base64.b64decode(shot["image"])
+            image = Image.open(io.BytesIO(image_data))
+            ocr_text = pytesseract.image_to_string(image)
+
+            print(f"Looking for: {expected_text}")
+            print(f"OCR found (first 500 chars): {ocr_text[:500]}")
+
+            # Verify our unique text appears in OCR output
+            assert expected_text in ocr_text or unique_id in ocr_text, (
+                f"Expected '{expected_text}' not found in OCR output. "
+                "Paste-based input may not have worked correctly."
+            )
+
+            # Close terminal
+            if platform.system() == "Darwin":
+                hotkey(["cmd", "q"])
+            else:
+                hotkey(["alt", "f4"])
+
+            print("Paste OCR verification completed successfully!")
+
+        except Exception as e:
+            try:
+                if platform.system() == "Darwin":
+                    hotkey(["cmd", "q"])
+                else:
+                    hotkey(["alt", "f4"])
+            except Exception:
+                pass
+            raise e
+
+
 class TestBatchOperations:
     """Test running multiple operations in sequence."""
 
