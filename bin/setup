@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# one-command setup — established by dz-runner setup mode. One command; adjust as the repo grows.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+command -v mise >/dev/null && mise install
+(dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 || (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)) && uv sync --extra dev
