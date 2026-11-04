@@ -11,12 +11,34 @@ Delete either table and uv silently hoists the lockfile to the repository
 root - no build, test or CI step notices. These tests make that failure loud.
 """
 
+import re
 import tomllib
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_MEMBER = "apps/ai-gaming-agent-mcp"
+
+# Documentation a reader copies commands from. Every `cd ... && ...` in them
+# has to survive being pasted line by line into one shell.
+DOC_COMMAND_FILES = (
+    "README.md",
+    "CLAUDE.md",
+    "docs/integration-testing.md",
+    "docs/testing.md",
+    ".claude/skills/integration-gui/SKILL.md",
+)
+
+_CD_CHAIN = re.compile(r"cd\s+\S+\s*&&")
+
+
+def _command_units(text: str) -> list[str]:
+    """Return the commands a reader can paste: fenced shell blocks and inline code."""
+    units: list[str] = []
+    for block in re.findall(r"```(?:bash|sh|shell)\n(.*?)```", text, flags=re.DOTALL):
+        units.extend(block.splitlines())
+    units.extend(re.findall(r"`([^`\n]+)`", text))
+    return units
 
 
 def _load_toml(path: Path) -> dict:
@@ -110,3 +132,30 @@ def test_app_sources_and_tests_live_in_the_app_directory():
     assert (APP_DIR / "tests").is_dir(), "the app test suite must live in the app directory"
     assert not (REPO_ROOT / "src").exists(), "the app sources must not stay at the repository root"
     assert not (REPO_ROOT / "tests").exists(), "the app tests must not stay at the repository root"
+
+
+def test_documented_commands_do_not_change_the_callers_working_directory():
+    """A documented `cd ... && ...` must run inside a subshell.
+
+    The development blocks are pasted line by line into one shell. A bare
+    `cd apps/ai-gaming-agent-mcp && uv sync --extra dev` leaves that shell inside
+    the app directory, so the next line's `cd apps/ai-gaming-agent-mcp` fails with
+    "No such file or directory" and the lint and test commands never run. A
+    subshell keeps the caller's directory untouched.
+    """
+    violations: list[str] = []
+
+    for relative in DOC_COMMAND_FILES:
+        path = REPO_ROOT / relative
+        assert path.is_file(), f"missing documentation file: {path}"
+
+        for unit in _command_units(path.read_text(encoding="utf-8")):
+            match = _CD_CHAIN.search(unit)
+            if match is None:
+                continue
+            if not unit[: match.start()].rstrip().endswith("("):
+                violations.append(f"{relative}: {unit.strip()}")
+            elif ")" not in unit[match.end() :]:
+                violations.append(f"{relative}: {unit.strip()}")
+
+    assert not violations, "documented commands must run in a subshell: " + "; ".join(violations)

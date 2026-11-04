@@ -34,7 +34,7 @@ sudo apt-get install -y tesseract-ocr
 
 ```bash
 # Run all integration tests
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)
 
 # Expected output: 30 passed, 4 skipped (without tesseract)
 # With tesseract: 34 passed
@@ -44,13 +44,13 @@ cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
 
 ```bash
 # Test full workflow (HTTP server + GUI automation)
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v)
 
 # Test demo workflow
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_demo_workflow.py -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_demo_workflow.py -v)
 
 # Test GUI automation primitives
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_gui_automation.py -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_gui_automation.py -v)
 ```
 
 ### Test Coverage
@@ -102,7 +102,7 @@ Integration tests automatically skip when:
 
 Check the skip reason:
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)
 # Look for skip reason in output
 ```
 

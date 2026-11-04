@@ -425,17 +425,17 @@ To use the `analyze_screen` tool with local vision models:
 ## Development
 
 ```bash
-# Install with uv (recommended) - run from the app directory
-cd apps/ai-gaming-agent-mcp && uv sync --extra dev
+# Install with uv (recommended) - run from the repository root
+(cd apps/ai-gaming-agent-mcp && uv sync --extra dev)
 
 # Or with pip
-cd apps/ai-gaming-agent-mcp && pip install -e ".[dev]"
+(cd apps/ai-gaming-agent-mcp && pip install -e ".[dev]")
 
 # Lint
-cd apps/ai-gaming-agent-mcp && uv run ruff check src tests
+(cd apps/ai-gaming-agent-mcp && uv run ruff check src tests)
 
 # Run unit tests
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)
 ```
 
 ## Testing
@@ -446,7 +446,7 @@ Unit tests run in CI on every push/PR. They test configuration, file operations,
 
 ```bash
 # Run unit tests only
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)
 ```
 
 ### Integration Tests (Local Only)
@@ -460,7 +460,7 @@ Integration tests perform **real GUI automation** and require:
 
 ```bash
 # Install integration test dependencies
-cd apps/ai-gaming-agent-mcp && uv sync --extra integration
+(cd apps/ai-gaming-agent-mcp && uv sync --extra integration)
 
 # Install tesseract (Linux)
 sudo apt install tesseract-ocr
@@ -469,7 +469,7 @@ sudo apt install tesseract-ocr
 brew install tesseract
 
 # Run integration tests locally
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)
 ```
 
 #### What Integration Tests Do

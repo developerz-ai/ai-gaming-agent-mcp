@@ -15,7 +15,7 @@ Unit tests verify individual components without requiring a display:
 
 **Run locally:**
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)
 ```
 
 **Runs in CI:** Yes (GitHub Actions)
@@ -32,7 +32,7 @@ Integration tests perform **real GUI automation** on your desktop:
 
 **Run locally:**
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)
 ```
 
 **Runs in CI:** No - requires real display
@@ -66,7 +66,7 @@ brew install tesseract
 ### Python Dependencies
 
 ```bash
-cd apps/ai-gaming-agent-mcp && uv sync --extra integration
+(cd apps/ai-gaming-agent-mcp && uv sync --extra integration)
 ```
 
 This installs:
@@ -208,15 +208,15 @@ Use the `ensure_gui` fixture to verify pyautogui is available.
 
 ### Run single test with output:
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_gui_automation.py::TestTerminalAutomation::test_terminal_workflow -v -s
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_gui_automation.py::TestTerminalAutomation::test_terminal_workflow -v -s)
 ```
 
 ### Check why tests are skipped:
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v --collect-only
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v --collect-only)
 ```
 
 ### Run with warnings:
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v -W default
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v -W default)
 ```

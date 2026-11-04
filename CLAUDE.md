@@ -27,7 +27,7 @@ Master Claude (Orchestrator)
 
 The application lives in `apps/ai-gaming-agent-mcp/` - its own uv project with its own
 `pyproject.toml`, `uv.lock`, `src/` and `tests/`. Every uv/pytest/ruff command below runs
-from that directory (`cd apps/ai-gaming-agent-mcp && <command>`); the repository root only
+from that directory (`(cd apps/ai-gaming-agent-mcp && <command>)`); the repository root only
 registers the app as a uv workspace member.
 
 ```
@@ -64,11 +64,11 @@ apps/ai-gaming-agent-mcp/
 
 ```bash
 # Development (run from the repository root; the app lives in apps/ai-gaming-agent-mcp)
-cd apps/ai-gaming-agent-mcp && uv sync --extra dev    # Install dependencies
-cd apps/ai-gaming-agent-mcp && uv run ruff check src tests    # Lint
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v  # Unit tests (CI)
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v     # Integration tests (local only)
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v  # Test complete workflow
+(cd apps/ai-gaming-agent-mcp && uv sync --extra dev)    # Install dependencies
+(cd apps/ai-gaming-agent-mcp && uv run ruff check src tests)    # Lint
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)  # Unit tests (CI)
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)     # Integration tests (local only)
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v)  # Test complete workflow
 
 # Running the server
 gaming-agent init --password secret              # Create config
@@ -297,14 +297,14 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 - Run in GitHub Actions on every push/PR
 - Test config, file operations, tool interfaces
 - No display required
-- Command: `cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v`
+- Command: `(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)`
 
 ### Integration Tests (Local Only)
 - Require real display (X11/Windows/macOS)
 - Perform actual GUI automation
 - OCR verification with tesseract
 - Auto-skip in CI (detected via `CI=true` env var)
-- Command: `cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v`
+- Command: `(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)`
 
 ## Documentation
 
@@ -340,13 +340,13 @@ When working on this project, follow this pattern:
 ### 3. Validating Changes
 ```bash
 # Unit tests (no display required - runs in CI)
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v)
 
 # Integration tests (requires display - local only)
-cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
+(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)
 
 # Linting and type checking
-cd apps/ai-gaming-agent-mcp && uv run ruff check src tests
+(cd apps/ai-gaming-agent-mcp && uv run ruff check src tests)
 ```
 
 ### 4. Important Notes
