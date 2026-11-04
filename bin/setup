@@ -45,8 +45,9 @@ fi
 
 # System prerequisites for the GUI/OCR tooling. These are only needed by the
 # integration suite and by the dev server, never by the Python dependency
-# install, so a missing package must not abort setup.
-SYSTEM_PACKAGES=(xvfb scrot python3-tk python3-dev tesseract-ocr)
+# install, so a missing package must not abort setup. xauth is here because
+# the dev server needs it to give its virtual display an authority cookie.
+SYSTEM_PACKAGES=(xvfb xauth scrot python3-tk python3-dev tesseract-ocr)
 
 missing_packages() {
   local pkg
