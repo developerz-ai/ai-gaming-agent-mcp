@@ -223,14 +223,75 @@ except Exception:
 display.close()
 sys.exit(0)'
 
-# Probe an AUTHENTICATED X connection to $1.
+# Seconds an X probe may run before it is killed and its display is treated
+# as unreachable. A socket that accepts the connection but never completes
+# the handshake would otherwise hold the probe — and with it the fallback
+# below and start_xvfb's 20-second deadline — forever. The bound sits well
+# under that deadline, so a timed-out probe still leaves the loop room to
+# act on what it learned.
+X_PROBE_TIMEOUT=5
+
+# True while the probe job $1 is still running. kill -0 also succeeds for a
+# child that already exited but has not been reaped yet, so the shell's own
+# job table is asked as well (the same pattern xvfb_running uses).
+_probe_running() {
+  kill -0 "$1" 2>/dev/null || return 1
+  local job_pid
+  for job_pid in $(jobs -p 2>/dev/null); do
+    [ "$job_pid" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Wait at most $X_PROBE_TIMEOUT seconds for the probe running as background
+# job $1, then kill it and report 124 — the exit code the timeout tool uses —
+# so callers see one code for "the probe overran its bound" on both paths.
+# Without setsid the probe shares THIS script's process group, so a bare
+# group signal would name the launcher itself; the plain pid kill is the
+# safe fallback there.
+_bound_probe_wait() {
+  local pid="$1"
+  local deadline=$((SECONDS + X_PROBE_TIMEOUT))
+  while _probe_running "$pid" && [ "$SECONDS" -lt "$deadline" ]; do
+    sleep 0.1
+  done
+  if ! _probe_running "$pid"; then
+    wait "$pid" 2>/dev/null
+    return $?
+  fi
+  kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  local grace=0
+  while _probe_running "$pid" && [ "$grace" -lt 20 ]; do
+    sleep 0.1
+    grace=$((grace + 1))
+  done
+  kill -KILL "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null
+  return 124
+}
+
+# Probe an AUTHENTICATED X connection to $1, bounded: the probe process is
+# killed after $X_PROBE_TIMEOUT seconds and its overrun counts as a refusal.
 #   0  the display accepted us
-#   1  the display refused us (no cookie, wrong cookie, not running)
+#   1  the display refused us — a handshake that never completes included
 #   3  no X client is available to probe with
 x_probe() {
   local display="$1"
   local rc=0
-  DISPLAY="$display" uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 || rc=$?
+  if command -v timeout >/dev/null 2>&1; then
+    # The timeout tool runs the probe in a process group of its own and
+    # signals the whole group at the bound, so the python process behind
+    # `uv run` cannot outlive it.
+    DISPLAY="$display" timeout "$X_PROBE_TIMEOUT" \
+      uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 || rc=$?
+  else
+    if command -v setsid >/dev/null 2>&1; then
+      DISPLAY="$display" setsid uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 &
+    else
+      DISPLAY="$display" uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 &
+    fi
+    _bound_probe_wait "$!" || rc=$?
+  fi
   case "$rc" in
     0) return 0 ;;
     3) return 3 ;;

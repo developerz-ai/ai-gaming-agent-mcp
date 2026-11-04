@@ -46,6 +46,7 @@ def _run_script(
     sync_exit: int = 0,
     ruff_exit: int = 0,
     pytest_exit: int = 0,
+    timeout: float | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a lifecycle script with isolated toolchain controls."""
@@ -63,14 +64,21 @@ def _run_script(
     env["FAKE_UV_PYTEST_EXIT"] = str(pytest_exit)
     if extra_env:
         env.update(extra_env)
-    return subprocess.run(
-        [str(REPO_ROOT / "bin" / script)],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        return subprocess.run(
+            [str(REPO_ROOT / "bin" / script)],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise AssertionError(
+            f"{script} did not finish within {timeout}s — an unbounded wait has regressed.\n"
+            f"stdout: {exc.stdout!r}\nstderr: {exc.stderr!r}"
+        ) from exc
 
 
 def _make_fake_uv(tmp_path: Path) -> Path:
@@ -85,7 +93,15 @@ def _make_fake_uv(tmp_path: Path) -> Path:
         """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "${FAKE_UV_LOG:?}"
 case "$*" in
-  *Xlib.display*) exit "${FAKE_X_PROBE_EXIT:-0}" ;;
+  *Xlib.display*)
+    # FAKE_X_PROBE_SLEEP stalls the probe against the display the test
+    # names — like a socket that accepts the connection but never
+    # completes the handshake.
+    if [ -n "${FAKE_X_PROBE_SLEEP:-}" ] && [ "${DISPLAY:-}" = "${FAKE_X_PROBE_HANG_DISPLAY:-}" ]; then
+      sleep "$FAKE_X_PROBE_SLEEP"
+    fi
+    exit "${FAKE_X_PROBE_EXIT:-0}"
+    ;;
 esac
 case "$*" in
   *"gaming-agent serve"*)
@@ -237,11 +253,18 @@ exit 1
 """
 
 
-def _dev_sandbox(tmp_path: Path, *, xvfb_body: str = FAKE_XVFB, with_xauth: bool = True) -> Path:
+def _dev_sandbox(
+    tmp_path: Path,
+    *,
+    xvfb_body: str = FAKE_XVFB,
+    with_xauth: bool = True,
+    extra_tools: tuple[str, ...] = (),
+) -> Path:
     """A sandbox with fakes for the X tools bin/dev needs.
 
     Nothing here comes from the box: the unit gate must pass on a checkout
-    that has no GUI package installed at all.
+    that has no GUI package installed at all. extra_tools names REAL tools
+    to link in from the box; the default keeps the sandbox minimal.
     """
     _write_fake(tmp_path, "Xvfb", xvfb_body)
     _write_fake(tmp_path, "mcookie", FAKE_MCOOKIE)
@@ -249,7 +272,7 @@ def _dev_sandbox(tmp_path: Path, *, xvfb_body: str = FAKE_XVFB, with_xauth: bool
     if with_xauth:
         _write_fake(tmp_path, "xauth", FAKE_XAUTH)
         tools.append("xauth")
-    return _sandbox_path(tmp_path, *tools)
+    return _sandbox_path(tmp_path, *tools, *extra_tools)
 
 
 def _package_version() -> str:
@@ -717,6 +740,72 @@ def test_dev_falls_back_when_the_display_refuses_the_connection(tmp_path: Path) 
     # No X server is reachable and none can be started, so this is an
     # unreachable environment (75), never "the change is red" (1).
     assert result.returncode == 75, result.stderr
+
+
+def test_dev_falls_back_when_a_display_never_completes_the_handshake(tmp_path: Path) -> None:
+    """A display that accepts the connection but never answers must not stall the launcher.
+
+    Such a socket would otherwise hold the X probe — and with it the
+    virtual-display fallback and start_xvfb's 20-second deadline — forever.
+    The probe has to be killed at its bound, the display treated as
+    unreachable, and the launcher has to move on to a virtual one.
+    """
+    sandbox = _dev_sandbox(tmp_path, extra_tools=("timeout",))
+    env_log = tmp_path / "uv-env.log"
+    result = _run_script(
+        "dev",
+        path=sandbox,
+        home=tmp_path / "home",
+        fake_uv_log=tmp_path / "uv.log",
+        fake_uv_env_log=env_log,
+        timeout=30,
+        extra_env={
+            "DISPLAY": ":199",
+            "PATH": str(sandbox),
+            # The probe against :199 stalls far beyond any sane bound; the
+            # probes against the virtual display answer immediately.
+            "FAKE_X_PROBE_SLEEP": "120",
+            "FAKE_X_PROBE_HANG_DISPLAY": ":199",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "falling back to a virtual display" in result.stderr
+    # The stalled display was never handed to the server; a virtual one was.
+    env_lines = env_log.read_text().splitlines()
+    assert not any("DISPLAY=:199" in line for line in env_lines), env_lines
+    assert any(re.search(r"DISPLAY=:\d+(?:\s|$)", line) for line in env_lines), env_lines
+
+
+def test_dev_bounds_the_probe_even_without_the_timeout_tool(tmp_path: Path) -> None:
+    """The probe bound cannot depend on the coreutils timeout tool.
+
+    A box without `timeout` on its PATH must get the same behaviour: the
+    probe killed at the bound and the stalled display given up on.
+    """
+    sandbox = _dev_sandbox(tmp_path)
+    assert shutil.which("timeout", path=str(sandbox)) is None, "the sandbox must not carry timeout"
+    env_log = tmp_path / "uv-env.log"
+    result = _run_script(
+        "dev",
+        path=sandbox,
+        home=tmp_path / "home",
+        fake_uv_log=tmp_path / "uv.log",
+        fake_uv_env_log=env_log,
+        timeout=30,
+        extra_env={
+            "DISPLAY": ":199",
+            "PATH": str(sandbox),
+            "FAKE_X_PROBE_SLEEP": "120",
+            "FAKE_X_PROBE_HANG_DISPLAY": ":199",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "falling back to a virtual display" in result.stderr
+    env_lines = env_log.read_text().splitlines()
+    assert not any("DISPLAY=:199" in line for line in env_lines), env_lines
+    assert any(re.search(r"DISPLAY=:\d+(?:\s|$)", line) for line in env_lines), env_lines
 
 
 def test_dev_reports_an_unreachable_environment_when_the_virtual_display_fails(tmp_path: Path) -> None:
