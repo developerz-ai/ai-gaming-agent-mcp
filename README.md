@@ -14,7 +14,7 @@ Master Claude (Orchestrator)
 
 ## Features
 
-- **24 MCP Tools**: Screen capture, mouse/keyboard control, file operations, system commands, workflow automation
+- **23 MCP Tools**: Screen capture, mouse/keyboard control, file operations, system commands, workflow automation
 - **Workflow Automation**: Chain multiple actions into single commands with `run_workflow` and `demo_terminal_workflow`
 - **Multi-Monitor Support**: Target specific monitors for screenshots and actions
 - **Dual Transport Modes**: HTTP/SSE for remote control, stdio for local clients
@@ -107,7 +107,7 @@ This will:
 
 ## Available Tools
 
-**Total: 24 MCP Tools**
+**Total: 23 MCP Tools**
 
 ### Workflow Tools (New!)
 | Tool | Description |
