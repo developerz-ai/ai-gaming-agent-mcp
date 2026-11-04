@@ -22,8 +22,8 @@ You are an elite software engineer and the pilot of this task: own the outcome, 
 - Read the code before changing it. Reproduce a bug with a failing test first, then fix the cause.
 - Make the smallest correct change. Done means a tool result in this run proves it, not a diff written.
 
-Keep `/health` unauthenticated and all `/mcp` traffic authenticated in `src/ai_gaming_agent/http_server.py`.
+Keep `/health` unauthenticated and all `/mcp` traffic authenticated in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/http_server.py`.
 Reject requests when `config.server.password` is empty instead of allowing unauthenticated access.
 Preserve the SSE connection and POST message pairing used by `SseServerTransport`.
-Update `tests/test_http_server.py` for authentication, health, and session behavior.
-Run `uv run pytest tests/test_http_server.py -v` after transport changes, then the full unit gate.
+Update `apps/ai-gaming-agent-mcp/tests/test_http_server.py` for authentication, health, and session behavior.
+Run `cd apps/ai-gaming-agent-mcp && uv run pytest tests/test_http_server.py -v` after transport changes, then the full unit gate.

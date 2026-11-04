@@ -7,7 +7,7 @@
 
 ## Stack
 
-Python 3.12 + uv. The gate is `bin/check` (`uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`): a change that does not pass it is not proven, whatever its description says.
+Python 3.12 + uv. The gate is `bin/check` (`cd apps/ai-gaming-agent-mcp && uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`): a change that does not pass it is not proven, whatever its description says.
 
 ## Review conventions
 

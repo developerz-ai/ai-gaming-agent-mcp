@@ -3,4 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 command -v mise >/dev/null && mise install
-(dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 || (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)) && uv sync --extra dev
+dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 || (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)
+# The app project (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: sync from there.
+cd apps/ai-gaming-agent-mcp
+uv sync --extra dev

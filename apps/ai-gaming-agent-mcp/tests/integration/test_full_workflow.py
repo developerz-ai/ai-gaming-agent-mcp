@@ -7,7 +7,7 @@ These tests perform a COMPLETE workflow:
 4. Validate output with OCR (if available)
 5. Clean up resources
 
-Run locally only: uv run pytest tests/integration/test_full_workflow.py -v
+Run locally only: cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v
 
 Requirements:
 - A display (X11, Wayland with XWayland, Windows, macOS)

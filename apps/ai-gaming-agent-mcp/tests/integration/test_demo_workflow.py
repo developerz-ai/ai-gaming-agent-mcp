@@ -6,7 +6,7 @@ These tests perform REAL GUI actions on your desktop:
 - Capture screenshots
 - Close the terminal
 
-Run locally only: uv run pytest tests/integration/test_demo_workflow.py -v
+Run locally only: cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_demo_workflow.py -v
 
 Requirements:
 - A display (X11, Wayland with XWayland, Windows, macOS)

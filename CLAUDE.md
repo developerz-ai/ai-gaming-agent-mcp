@@ -25,44 +25,50 @@ Master Claude (Orchestrator)
 
 ## Project Structure
 
-```
-src/ai_gaming_agent/
-├── __init__.py              # Package version
-├── cli.py                   # CLI commands (serve, init, config)
-├── config.py                # Configuration management (JSON file)
-├── server.py                # MCP server implementation (stdio transport)
-├── http_server.py           # FastAPI + SSE HTTP server with Bearer token auth
-└── tools/                   # 24 MCP tools
-    ├── screen.py            # screenshot, get_screen_size
-    ├── mouse.py             # click, move_to, drag_to, scroll
-    ├── keyboard.py          # type_text, press_key, hotkey
-    ├── files.py             # read/write/list/upload/download
-    ├── system.py            # execute_command, focus_window
-    ├── workflow.py          # run_workflow, demo_terminal_workflow
-    └── vlm.py               # analyze_screen (optional Ollama integration)
+The application lives in `apps/ai-gaming-agent-mcp/` - its own uv project with its own
+`pyproject.toml`, `uv.lock`, `src/` and `tests/`. Every uv/pytest/ruff command below runs
+from that directory (`cd apps/ai-gaming-agent-mcp && <command>`); the repository root only
+registers the app as a uv workspace member.
 
-tests/
-├── test_config.py           # Unit tests for config
-├── test_tools.py            # Unit tests for tools
-├── test_http_server.py      # Unit tests for HTTP/SSE server
-├── test_workflow.py         # Unit tests for workflow tools
-├── test_vlm.py              # Unit tests for VLM tool
-├── test_cli.py              # Unit tests for CLI
-└── integration/             # Integration tests (LOCAL ONLY)
-    ├── test_gui_automation.py
-    ├── test_demo_workflow.py
-    └── test_full_workflow.py
+```
+apps/ai-gaming-agent-mcp/
+├── src/ai_gaming_agent/
+│   ├── __init__.py              # Package version
+│   ├── cli.py                   # CLI commands (serve, init, config)
+│   ├── config.py                # Configuration management (JSON file)
+│   ├── server.py                # MCP server implementation (stdio transport)
+│   ├── http_server.py           # FastAPI + SSE HTTP server with Bearer token auth
+│   └── tools/                   # 24 MCP tools
+│       ├── screen.py            # screenshot, get_screen_size
+│       ├── mouse.py             # click, move_to, drag_to, scroll
+│       ├── keyboard.py          # type_text, press_key, hotkey
+│       ├── files.py             # read/write/list/upload/download
+│       ├── system.py            # execute_command, focus_window
+│       ├── workflow.py          # run_workflow, demo_terminal_workflow
+│       └── vlm.py               # analyze_screen (optional Ollama integration)
+│
+├── tests/
+│   ├── test_config.py           # Unit tests for config
+│   ├── test_tools.py            # Unit tests for tools
+│   ├── test_http_server.py      # Unit tests for HTTP/SSE server
+│   ├── test_workflow.py         # Unit tests for workflow tools
+│   ├── test_vlm.py              # Unit tests for VLM tool
+│   ├── test_cli.py              # Unit tests for CLI
+│   └── integration/             # Integration tests (LOCAL ONLY)
+│       ├── test_gui_automation.py
+│       ├── test_demo_workflow.py
+│       └── test_full_workflow.py
 ```
 
 ## Key Commands
 
 ```bash
-# Development
-uv sync --extra dev                    # Install dependencies
-uv run ruff check src tests            # Lint
-uv run pytest tests/ --ignore=tests/integration -v  # Unit tests (CI)
-uv run pytest tests/integration -v     # Integration tests (local only)
-uv run pytest tests/integration/test_full_workflow.py -v  # Test complete workflow
+# Development (run from the repository root; the app lives in apps/ai-gaming-agent-mcp)
+cd apps/ai-gaming-agent-mcp && uv sync --extra dev    # Install dependencies
+cd apps/ai-gaming-agent-mcp && uv run ruff check src tests    # Lint
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v  # Unit tests (CI)
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v     # Integration tests (local only)
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_full_workflow.py -v  # Test complete workflow
 
 # Running the server
 gaming-agent init --password secret              # Create config
@@ -71,7 +77,7 @@ gaming-agent serve --transport stdio             # Start stdio server (for paren
 gaming-agent config                              # Show config
 
 # Quick workflow test
-python examples/terminal_demo.py                 # Run demo terminal workflow
+python apps/ai-gaming-agent-mcp/examples/terminal_demo.py                 # Run demo terminal workflow
 ```
 
 ## Configuration
@@ -291,14 +297,14 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 - Run in GitHub Actions on every push/PR
 - Test config, file operations, tool interfaces
 - No display required
-- Command: `uv run pytest tests/ --ignore=tests/integration -v`
+- Command: `cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v`
 
 ### Integration Tests (Local Only)
 - Require real display (X11/Windows/macOS)
 - Perform actual GUI automation
 - OCR verification with tesseract
 - Auto-skip in CI (detected via `CI=true` env var)
-- Command: `uv run pytest tests/integration -v`
+- Command: `cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v`
 
 ## Documentation
 
@@ -312,35 +318,35 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 | `docs/architecture.txt` | System design |
 | `docs/security.txt` | Security best practices |
 | `README.md` | **UPDATED:** Includes workflow section and quick test |
-| `examples/terminal_demo.py` | **NEW:** Standalone Python script for terminal workflow demo |
-| `idea.md` | Full architecture specification |
+| `apps/ai-gaming-agent-mcp/examples/terminal_demo.py` | **NEW:** Standalone Python script for terminal workflow demo |
+| `apps/ai-gaming-agent-mcp/idea.md` | Full architecture specification |
 
 ## Development Workflow
 
 When working on this project, follow this pattern:
 
 ### 1. Understanding a New Feature
-- Read the relevant tool file in `src/ai_gaming_agent/tools/`
-- Check the corresponding test file in `tests/`
+- Read the relevant tool file in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/`
+- Check the corresponding test file in `apps/ai-gaming-agent-mcp/tests/`
 - Review the documentation in `docs/`
 
 ### 2. Making Changes
-- Edit tool implementation (e.g., `src/ai_gaming_agent/tools/workflow.py`)
-- Update tool registry in `src/ai_gaming_agent/server.py`
-- Update tool exports in `src/ai_gaming_agent/tools/__init__.py`
-- Add unit tests in `tests/test_*.py`
-- Add integration tests if GUI interaction needed in `tests/integration/`
+- Edit tool implementation (e.g., `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/workflow.py`)
+- Update tool registry in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/server.py`
+- Update tool exports in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/__init__.py`
+- Add unit tests in `apps/ai-gaming-agent-mcp/tests/test_*.py`
+- Add integration tests if GUI interaction needed in `apps/ai-gaming-agent-mcp/tests/integration/`
 
 ### 3. Validating Changes
 ```bash
 # Unit tests (no display required - runs in CI)
-uv run pytest tests/ --ignore=tests/integration -v
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
 
 # Integration tests (requires display - local only)
-uv run pytest tests/integration -v
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
 
 # Linting and type checking
-uv run ruff check src tests
+cd apps/ai-gaming-agent-mcp && uv run ruff check src tests
 ```
 
 ### 4. Important Notes

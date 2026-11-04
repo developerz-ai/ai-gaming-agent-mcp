@@ -6,7 +6,7 @@ This document explains the testing strategy for AI Gaming Agent.
 
 ### Unit Tests (CI)
 
-**Location:** `tests/` (excluding `tests/integration/`)
+**Location:** `apps/ai-gaming-agent-mcp/tests/` (excluding `apps/ai-gaming-agent-mcp/tests/integration/`)
 
 Unit tests verify individual components without requiring a display:
 - Configuration loading/saving
@@ -15,14 +15,14 @@ Unit tests verify individual components without requiring a display:
 
 **Run locally:**
 ```bash
-uv run pytest tests/ --ignore=tests/integration -v
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/ --ignore=tests/integration -v
 ```
 
 **Runs in CI:** Yes (GitHub Actions)
 
 ### Integration Tests (Local Only)
 
-**Location:** `tests/integration/`
+**Location:** `apps/ai-gaming-agent-mcp/tests/integration/`
 
 Integration tests perform **real GUI automation** on your desktop:
 - Actual mouse movements and clicks
@@ -32,7 +32,7 @@ Integration tests perform **real GUI automation** on your desktop:
 
 **Run locally:**
 ```bash
-uv run pytest tests/integration -v
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
 ```
 
 **Runs in CI:** No - requires real display
@@ -66,7 +66,7 @@ brew install tesseract
 ### Python Dependencies
 
 ```bash
-uv sync --extra integration
+cd apps/ai-gaming-agent-mcp && uv sync --extra integration
 ```
 
 This installs:
@@ -159,9 +159,12 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y xvfb scrot python3-tk python3-dev
-      - run: uv sync --extra dev
-      - run: uv run ruff check src tests
-      - run: uv run pytest tests/ --ignore=tests/integration -v
+      - working-directory: apps/ai-gaming-agent-mcp
+        run: uv sync --extra dev
+      - working-directory: apps/ai-gaming-agent-mcp
+        run: uv run ruff check src tests
+      - working-directory: apps/ai-gaming-agent-mcp
+        run: uv run pytest tests/ --ignore=tests/integration -v
 ```
 
 ### Key Points
@@ -169,14 +172,14 @@ jobs:
 1. **Single Python version**: 3.12 (latest stable)
 2. **Package manager**: uv (fast, deterministic)
 3. **Linting**: ruff (fast, comprehensive)
-4. **Integration tests excluded**: `--ignore=tests/integration`
+4. **Integration tests excluded**: `--ignore=tests/integration` (run from `apps/ai-gaming-agent-mcp`)
 5. **CI environment variable**: `CI=true` signals test skipping
 
 ## Writing New Tests
 
 ### Unit Tests
 
-Place in `tests/test_*.py`:
+Place in `apps/ai-gaming-agent-mcp/tests/test_*.py`:
 ```python
 def test_my_feature():
     from ai_gaming_agent.tools.files import read_file
@@ -186,7 +189,7 @@ def test_my_feature():
 
 ### Integration Tests
 
-Place in `tests/integration/test_*.py`:
+Place in `apps/ai-gaming-agent-mcp/tests/integration/test_*.py`:
 ```python
 import pytest
 
@@ -205,15 +208,15 @@ Use the `ensure_gui` fixture to verify pyautogui is available.
 
 ### Run single test with output:
 ```bash
-uv run pytest tests/integration/test_gui_automation.py::TestTerminalAutomation::test_terminal_workflow -v -s
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration/test_gui_automation.py::TestTerminalAutomation::test_terminal_workflow -v -s
 ```
 
 ### Check why tests are skipped:
 ```bash
-uv run pytest tests/integration -v --collect-only
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v --collect-only
 ```
 
 ### Run with warnings:
 ```bash
-uv run pytest tests/integration -v -W default
+cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v -W default
 ```

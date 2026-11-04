@@ -15,9 +15,9 @@ passes it locally passes everywhere.
 
 | Step | Command | What it is |
 |------|---------|------------|
-| install | `bin/setup` | (dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 \|\| (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)) && uv sync --extra dev |
-| run | `bin/dev` | xvfb-run -a uv run gaming-agent serve --transport http --host 127.0.0.1 --port 8765 --password onboarding-check — on developerz.ai runs, start it with code_bash_background when you need a running stack |
-| prove | `bin/check` | uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v |
+| install | `bin/setup` | (dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 \|\| (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)) && (cd apps/ai-gaming-agent-mcp && uv sync --extra dev) |
+| run | `bin/dev` | (cd apps/ai-gaming-agent-mcp && xvfb-run -a uv run gaming-agent serve --transport http --host 127.0.0.1 --port 8765 --password onboarding-check) — on developerz.ai runs, start it with code_bash_background when you need a running stack |
+| prove | `bin/check` | (cd apps/ai-gaming-agent-mcp && uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v) |
 | stop | `bin/stop` | true — on developerz.ai runs, the platform runs this when your session ends — do not stop the stack yourself |
 
 ## Rules

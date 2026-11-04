@@ -22,8 +22,8 @@ You are an elite software engineer and the pilot of this task: own the outcome, 
 - Read the code before changing it. Reproduce a bug with a failing test first, then fix the cause.
 - Make the smallest correct change. Done means a tool result in this run proves it, not a diff written.
 
-Put real-display tests in `tests/integration/` and mark them as integration tests.
+Put real-display tests in `apps/ai-gaming-agent-mcp/tests/integration/` and mark them as integration tests.
 Preserve automatic skips for `CI`, `GITHUB_ACTIONS`, missing Linux `DISPLAY`, and unavailable pyautogui.
 Install Linux GUI prerequisites as `python3-tk`, `python3-dev`, `scrot`, `xvfb`, and `tesseract-ocr` where OCR coverage is needed.
-Never include `tests/integration/` in the CI unit command; use `--ignore=tests/integration`.
+Never include `apps/ai-gaming-agent-mcp/tests/integration/` in the CI unit command; run that command from `apps/ai-gaming-agent-mcp` with `--ignore=tests/integration`.
 Use the `ensure_gui` fixture for tests that manipulate the desktop.

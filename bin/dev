@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # one-command dev — established by dz-runner setup mode. One command; adjust as the repo grows.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# The app project (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: run uv there.
+cd "$(dirname "$0")/../apps/ai-gaming-agent-mcp"
 xvfb-run -a uv run gaming-agent serve --transport http --host 127.0.0.1 --port 8765 --password onboarding-check
