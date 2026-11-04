@@ -2,11 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Repository brain for AI Gaming Agent: an MCP server for remote PC automation. Package version: **0.2.0**.
+
+## Non-negotiable rules
+
+| Rule | Requirement |
+|------|-------------|
+| Gate | `bin/check` is the gate. Red is not a pull request; fix the cause. |
+| Verify | Run the narrowest relevant check first; the harness runs the full gate after all editors finish. |
+| Tests | Reproduce a bug with a failing test before fixing it. Never delete or weaken a test to get green. |
+| Guards | Never silence a lint, type, test, or security guard. A machine-enforced rule wins. |
+| Disclosure | Agents are bots; disclose that in usernames and every comment. Never impersonate a human. |
+| Merge gates | CI, review verdict, and branch protection decide merges. Never merge around red or missing gates; never self-approve. |
+| Bot etiquette | Never argue with or reply to another bot. Act on dependency-bot PRs like any other PR. |
+| Checkout | One checkout and branch. Never create a worktree; the harness owns commits, pushes, and PRs. |
+| File ownership | Edit only your assigned paths; report other required paths instead of touching them. |
+| Credentials | Resolve secrets from the vault at point of use. Never expose them in context, logs, comments, or commits. |
+| Scope | Do one task. Report unrelated defects separately; do not bundle them. |
+| Change discipline | Read before editing; make the smallest correct change; keep files under 500 LOC. |
+| Tool changes | Follow `.claude/agents/mcp-tools.md`: registry, export, workflow dispatch, tests, and docs stay aligned. |
+| GUI imports | Keep PyAutoGUI/Pillow-heavy imports lazy so CI needs no display. |
+| Tool results | Return dictionaries with consistent `success` and `error` keys. |
+
 ## Project Overview
 
 AI Gaming Agent is a distributed automation system where a Master Claude instance controls multiple remote gaming PCs through MCP (Model Context Protocol) servers. The primary use case is autonomous game account leveling across multiple machines simultaneously.
 
-**Current State:** Core implementation complete with MCP server, HTTP/SSE transport, CLI, and 24 tools including workflow automation.
+**Current State:** Core implementation complete with MCP server, HTTP/SSE transport, CLI, and 23 tools including workflow automation.
 
 ## Architecture
 
@@ -23,6 +45,23 @@ Master Claude (Orchestrator)
 - **Option B (Recommended):** Hybrid - Claude for high-level decisions, local VLM for fast visual processing
 - **Option C (Privacy):** Fully local orchestrator (e.g., Qwen3-72B), no cloud APIs
 
+## Stack
+
+| Area | Declared stack |
+|------|----------------|
+| Language | Python >=3.12 |
+| Package/build | uv, Hatchling |
+| MCP | `mcp>=1.0.0` |
+| HTTP | FastAPI >=0.115, `uvicorn[standard]` >=0.32 |
+| Automation | PyAutoGUI >=0.9.54, Pillow >=10, pyperclip >=1.8 |
+| Configuration | Pydantic >=2, pydantic-settings >=2 |
+| System | screeninfo >=0.8.1, psutil >=6 |
+| VLM (optional) | Ollama >=0.4 via the `vlm` extra |
+| Quality | Ruff >=0.8; pytest >=8 and pytest-asyncio >=0.24 via the `dev` extra |
+| Integration extra | pytest and pytesseract >=0.3.10 |
+
+Ruff targets Python 3.12, line length 120, and selects `E,F,I,W` (ignoring `E501`). Pytest uses `asyncio_mode = "auto"`, `testpaths = ["tests"]`, and the `integration` marker.
+
 ## Project Structure
 
 The application lives in `apps/ai-gaming-agent-mcp/` - its own uv project with its own
@@ -38,7 +77,7 @@ apps/ai-gaming-agent-mcp/
 │   ├── config.py                # Configuration management (JSON file)
 │   ├── server.py                # MCP server implementation (stdio transport)
 │   ├── http_server.py           # FastAPI + SSE HTTP server with Bearer token auth
-│   └── tools/                   # 24 MCP tools
+│   └── tools/                   # 23 MCP tools
 │       ├── screen.py            # screenshot, get_screen_size
 │       ├── mouse.py             # click, move_to, drag_to, scroll
 │       ├── keyboard.py          # type_text, press_key, hotkey
@@ -54,13 +93,48 @@ apps/ai-gaming-agent-mcp/
 │   ├── test_workflow.py         # Unit tests for workflow tools
 │   ├── test_vlm.py              # Unit tests for VLM tool
 │   ├── test_cli.py              # Unit tests for CLI
+│   ├── test_layout.py           # Layout pins (uv workspace, documented commands)
 │   └── integration/             # Integration tests (LOCAL ONLY)
 │       ├── test_gui_automation.py
 │       ├── test_demo_workflow.py
 │       └── test_full_workflow.py
 ```
 
-## Key Commands
+### Repository structure
+
+| Path | Responsibility |
+|------|----------------|
+| `pyproject.toml` | Repository root workspace manifest; registers the app as a member and is not a buildable project. |
+| `bin/` | `setup`, `dev`, `check`, and `stop` helpers; each runs uv inside the app directory. |
+| `docs/` | Documentation; see the Documentation index below. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/__init__.py` | Package version. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/cli.py` | CLI commands and transport selection. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/config.py` | Pydantic configuration and JSON persistence. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/server.py` | Stdio MCP server and tool registry. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/http_server.py` | FastAPI/SSE HTTP transport and authentication. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/screen.py` | Screen capture and dimensions. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/mouse.py` | Pointer control. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/keyboard.py` | Text and key input. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/files.py` | File operations and path validation. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/system.py` | Commands, processes, windows, and system information. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/workflow.py` | Workflow execution and tool dispatch. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/vlm.py` | Optional Ollama screen analysis. |
+| `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/__init__.py` | Lazy public exports for MCP tools. |
+| `apps/ai-gaming-agent-mcp/tests/test_*.py` | Unit tests: CLI, config, HTTP server, tools, VLM, and workflows. |
+| `apps/ai-gaming-agent-mcp/tests/integration/` | Display-dependent GUI and OCR integration tests; local only. |
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| `bin/setup` | Install system prerequisites (`xvfb`, `scrot`, `python3-tk`, `python3-dev`, `tesseract-ocr`) and run `uv sync --extra dev`. |
+| `bin/dev` | Run the HTTP server under `xvfb-run` on `127.0.0.1:8765` with the development password. |
+| `bin/check` | **The gate:** `uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`. |
+| `bin/stop` | Stop the development stack; currently a no-op. |
+
+CLI entry point: `gaming-agent`. Common subcommands are `gaming-agent init --password secret`, `gaming-agent serve` (HTTP by default), `gaming-agent serve --transport stdio`, and `gaming-agent config`.
+
+### Key Commands
 
 ```bash
 # Development (run from the repository root; the app lives in apps/ai-gaming-agent-mcp)
@@ -99,7 +173,7 @@ Server configuration lives at `~/.gaming-agent/config.json`:
   },
   "security": {
     "allowed_paths": ["/home/user/games"],
-    "blocked_commands": ["rm -rf", "format"],
+    "blocked_commands": ["rm -rf", "format", "del /f", "mkfs"],
     "max_command_timeout": 30
   },
   "features": {
@@ -112,17 +186,41 @@ Server configuration lives at `~/.gaming-agent/config.json`:
 }
 ```
 
-## MCP Tools (24 total)
+### Configuration defaults
+
+Configuration is stored at `~/.gaming-agent/config.json`. Environment overrides use the `GAMING_AGENT_` prefix and `__` for nested fields, such as `GAMING_AGENT_SERVER__PORT`.
+
+| Setting | Default | Note |
+|---------|---------|------|
+| `server.host` | `0.0.0.0` | Bind address. |
+| `server.port` | `8765` | HTTP port. |
+| `server.password` | empty string | Empty password causes HTTP authentication requests to be rejected with 403. |
+| `vlm.enabled` | `false` | VLM is optional. |
+| `vlm.provider` | `ollama` | Supported provider when enabled. |
+| `vlm.model` | `qwen2.5-vl:3b` | Model name. |
+| `vlm.endpoint` | `http://localhost:11434` | Ollama endpoint. |
+| `security.allowed_paths` | `[]` | Empty means unrestricted file paths. |
+| `security.blocked_commands` | `["rm -rf", "format", "del /f", "mkfs"]` | Command blocklist. |
+| `security.max_command_timeout` | `30` | Seconds. |
+| `features.screenshot` | `true` | Feature toggle. |
+| `features.file_access` | `true` | Feature toggle. |
+| `features.command_execution` | `true` | Feature toggle. |
+| `features.mouse_control` | `true` | Feature toggle. |
+| `features.keyboard_control` | `true` | Feature toggle. |
+
+## MCP tools (23)
 
 | Category | Tools |
 |----------|-------|
-| **Screen** | `screenshot`, `get_screen_size`, `analyze_screen` |
-| **Mouse** | `click`, `double_click`, `move_to`, `drag_to`, `scroll`, `get_mouse_position` |
-| **Keyboard** | `type_text` (with `use_paste` for fast input), `press_key`, `hotkey` |
-| **File** | `read_file`, `write_file`, `list_files`, `upload_file`, `download_file` |
-| **System** | `execute_command`, `get_system_info`, `list_windows`, `focus_window` |
-| **Workflow** | `run_workflow`, `demo_terminal_workflow` |
-| **VLM** | `analyze_screen` (optional Ollama integration) |
+| Screen | `screenshot`, `get_screen_size` |
+| Mouse | `click`, `double_click`, `move_to`, `drag_to`, `scroll`, `get_mouse_position` |
+| Keyboard | `type_text` (with `use_paste` for fast input), `press_key`, `hotkey` |
+| File | `read_file`, `write_file`, `list_files`, `upload_file`, `download_file` |
+| System | `execute_command`, `get_system_info`, `list_windows`, `focus_window` |
+| Workflow | `run_workflow`, `demo_terminal_workflow` |
+| VLM | `analyze_screen` (optional Ollama integration) |
+
+The registry in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/server.py` and exports in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/__init__.py` must remain aligned. Workflow details and `type_text(..., use_paste=True)` guidance live in `docs/workflow.md`; the API reference lives in `docs/tools.txt`.
 
 ## HTTP/SSE Transport (Remote Control)
 
@@ -144,7 +242,7 @@ gaming-agent serve
 ### Remote Connection Example
 ```bash
 curl -H "Authorization: Bearer your-password" http://localhost:8765/health
-# Returns: {"status": "ok", "version": "0.1.0"}
+# Returns: {"status": "ok", "version": "0.2.0"}
 ```
 
 ### Security
@@ -153,7 +251,15 @@ curl -H "Authorization: Bearer your-password" http://localhost:8765/health
 - Health endpoint requires no authentication
 - Enforce HTTPS in production
 
----
+### Transports
+
+| Transport | Interface | Authentication |
+|-----------|-----------|----------------|
+| HTTP/SSE (CLI default) | `GET /mcp` for SSE; `POST /mcp/messages` for messages | Bearer token required. Empty configured password rejects requests with 403; wrong token returns 401. |
+| Health | `GET /health` | None; returns the status and current package version. |
+| stdio | Standard input/output MCP transport | Managed by the parent MCP client. |
+
+Use HTTPS in production. The HTTP server exposes GUI automation on the configured bind address and port.
 
 ## Workflow Automation
 
@@ -246,8 +352,6 @@ A generic workflow executor that chains multiple actions:
 }
 ```
 
----
-
 ## Fast Text Input with `use_paste` Parameter
 
 The `type_text` tool now supports a `use_paste` parameter for significantly faster text input, especially useful for long strings or commands:
@@ -289,9 +393,15 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 }
 ```
 
----
+## Testing
 
-## Testing Strategy
+| Suite | Command | Environment |
+|-------|---------|-------------|
+| Unit/CI | `uv run pytest tests/ --ignore=tests/integration -v` | No display required. |
+| Integration | `uv run pytest tests/integration -v` | Real or isolated display; OCR cases require Tesseract. |
+| Gate | `bin/check` | Ruff plus the unit suite. |
+
+Integration tests are local-only and skip in CI. Before real-display GUI or OCR work, read `.claude/skills/integration-gui/SKILL.md`.
 
 ### Unit Tests (CI)
 - Run in GitHub Actions on every push/PR
@@ -306,20 +416,31 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 - Auto-skip in CI (detected via `CI=true` env var)
 - Command: `(cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v)`
 
+## Specialist instructions
+
+| Source | Use it for |
+|--------|------------|
+| `.claude/agents/mcp-tools.md` | MCP tool registry, handlers, workflow dispatch, tests, and tool documentation. |
+| `.claude/skills/verify-change/SKILL.md` | The repository gate and its required install/run/check/stop workflow. |
+| `.claude/skills/integration-gui/SKILL.md` | Real-display GUI and OCR integration tests. |
+
+These files are authoritative for their areas; do not duplicate their detailed rules here.
+
 ## Documentation
 
-| File | Content |
-|------|---------|
-| `docs/testing.md` | Complete testing guide (unit, integration, CI) |
-| `docs/configuration.md` | Config file reference with VLM setup |
-| `docs/integration-testing.md` | Integration testing with OCR and screenshots |
-| `docs/workflow.md` | **NEW:** Complete workflow automation guide with examples |
-| `docs/tools.txt` | MCP tools API reference (updated with new tools) |
-| `docs/architecture.txt` | System design |
-| `docs/security.txt` | Security best practices |
-| `README.md` | **UPDATED:** Includes workflow section and quick test |
-| `apps/ai-gaming-agent-mcp/examples/terminal_demo.py` | **NEW:** Standalone Python script for terminal workflow demo |
-| `apps/ai-gaming-agent-mcp/idea.md` | Full architecture specification |
+| Path | Contents |
+|------|----------|
+| `README.md` | Project overview and quick start. |
+| `docs/workflow.md` | Workflow concepts, `run_workflow`, terminal demo, and fast paste input. |
+| `docs/tools.txt` | MCP tool API reference. |
+| `docs/configuration.md` | Configuration and VLM setup. |
+| `docs/testing.md` | Unit, integration, and CI testing guide. |
+| `docs/integration-testing.md` | GUI and OCR integration testing. |
+| `docs/architecture.txt` | System design. |
+| `docs/security.txt` | Security practices. |
+| `docs/README.md` | Documentation index. |
+| `apps/ai-gaming-agent-mcp/examples/terminal_demo.py` | Standalone Python script for terminal workflow demo. |
+| `apps/ai-gaming-agent-mcp/idea.md` | Full architecture specification. |
 
 ## Development Workflow
 
@@ -355,8 +476,6 @@ When working on this project, follow this pattern:
 - **VLM Optional:** `analyze_screen` returns error if Ollama not configured
 - **Workflow Engine:** All tools must be callable from `_get_tool_handler()` in `workflow.py`
 - **Fast Text Input:** Use `type_text(..., use_paste=True)` for clipboard-based fast input when typing long strings or commands
-
----
 
 ## Code Standards
 
