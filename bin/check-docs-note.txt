@@ -1,0 +1,26 @@
+bin/check — where the gate runs
+==============================
+
+This file is a pointer, not a second description of the gate. The authoritative
+statements are the ones in the scripts themselves (bin/check's own header) and
+in .claude/skills/verify-change/SKILL.md. If this note and those ever
+disagree, those win — and this note should be corrected.
+
+Where each check runs:
+
+  * .githooks/pre-commit runs bin/check. That is the hook that gates a
+    commit; activate it once per clone with:
+        git config core.hooksPath .githooks
+
+  * CI (.github/workflows/ci.yml) does NOT invoke bin/check. It runs the
+    same two commands as two separate steps:
+        uv run ruff check src tests
+        uv run pytest tests/ --ignore=tests/integration -v
+
+Consequence for contributors: bin/check is the local gate (and the
+pre-commit hook); CI is a separate runner of the same lint + unit-test
+commands. Do not rely on bin/check's exit code 75 to be meaningful in
+CI — it only applies when bin/check itself is the entry point.
+
+Integration tests stay excluded from both (they need a real display and
+are local only).

@@ -1,6 +1,101 @@
 #!/usr/bin/env bash
 # one-command setup — established by dz-runner setup mode. One command; adjust as the repo grows.
+#
+# Setup prepares a fresh checkout: it installs the optional system packages the
+# GUI/OCR tooling needs and syncs the project environment. The system packages
+# are optional — failing to install them is reported and skipped. The project
+# environment is not optional: if it cannot be synced, setup fails with exit
+# 75 (an unreachable environment), never with a code that reads as "the change
+# is red".
 set -euo pipefail
 cd "$(dirname "$0")/.."
-command -v mise >/dev/null && mise install
-(dpkg -s xvfb scrot python3-tk python3-dev tesseract-ocr >/dev/null 2>&1 || (sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends xvfb scrot python3-tk python3-dev tesseract-ocr)) && uv sync --extra dev
+
+# Exit 75 means "a resource this command needs is unreachable" — the environment
+# is at fault, not the code. See .claude/skills/verify-change/SKILL.md.
+EXIT_ENV_UNREACHABLE=75
+
+# Toolchain: mise manages the pinned tool versions when it is available.
+if command -v mise >/dev/null 2>&1; then
+  if ! mise install; then
+    echo "setup: mise install failed; continuing without it (uv installs the project environment)." >&2
+  fi
+fi
+
+# uv ships the project environment; make sure it is reachable even when the
+# shell has not sourced the mise shims yet. The shim directory is listed first
+# because that is where mise installs uv by default.
+if ! command -v uv >/dev/null 2>&1; then
+  for candidate in \
+    "$HOME/.local/share/mise/shims" \
+    "$HOME/.local/bin" \
+    "$HOME/.cargo/bin" \
+    "/usr/local/bin"; do
+    if [ -x "$candidate/uv" ]; then
+      PATH="$candidate:$PATH"
+      export PATH
+      break
+    fi
+  done
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "setup: uv is not installed. Install it from https://docs.astral.sh/uv/ and re-run ./bin/setup" >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+# System prerequisites for the GUI/OCR tooling. These are only needed by the
+# integration suite and by the dev server, never by the Python dependency
+# install, so a missing package must not abort setup.
+SYSTEM_PACKAGES=(xvfb scrot python3-tk python3-dev tesseract-ocr)
+
+missing_packages() {
+  local pkg
+  for pkg in "${SYSTEM_PACKAGES[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "ok installed"; then
+      printf '%s\n' "$pkg"
+    fi
+  done
+}
+
+install_system_packages() {
+  local packages=("$@")
+
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "setup: apt-get not found; skipping system package install (${packages[*]})" >&2
+    return 0
+  fi
+
+  if [ "$(id -u)" -eq 0 ]; then
+    local -a sudo_cmd=()
+  elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    local -a sudo_cmd=(sudo -n)
+  else
+    echo "setup: need root to install ${packages[*]} but sudo is unavailable; skipping" >&2
+    return 0
+  fi
+
+  "${sudo_cmd[@]}" apt-get update >/dev/null 2>&1 || true
+  if ! "${sudo_cmd[@]}" apt-get install -y --no-install-recommends "${packages[@]}"; then
+    echo "setup: could not install ${packages[*]}; continuing without them" >&2
+    return 0
+  fi
+}
+
+if command -v dpkg-query >/dev/null 2>&1; then
+  mapfile -t absent < <(missing_packages)
+  if [ "${#absent[@]}" -gt 0 ]; then
+    echo "setup: installing system prerequisites: ${absent[*]}"
+    install_system_packages "${absent[@]}"
+  fi
+else
+  echo "setup: dpkg-query not found; skipping system package check" >&2
+fi
+
+# The project environment is the part setup cannot do without.
+if ! uv sync --extra dev; then
+  echo "setup: could not prepare the project environment (uv sync --extra dev failed)." >&2
+  echo "setup: the project environment is unreachable; fix the sync and re-run ./bin/setup." >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+echo "setup: ok — project environment is ready."
