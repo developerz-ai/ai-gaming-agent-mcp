@@ -7,7 +7,7 @@
 
 ## Stack
 
-Python 3.12 + uv. The gate is `bin/check` (`uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`): a change that does not pass it is not proven, whatever its description says.
+Python 3.12 + uv. The gate is `bin/check`, which prepares the environment (`uv sync --extra dev`) and then grades with `uv run ruff check src tests` and `uv run pytest tests/ --ignore=tests/integration -v`: a change that does not pass it is not proven, whatever its description says. Read its exit code before blaming a change — 0 means the change passes, 75 means the environment was unreachable and the change was never graded (blame the environment, never the change), 1 means the change is red. CI does not invoke `bin/check`; `.github/workflows/ci.yml` runs the same two commands itself as separate steps, so CI reports pass/fail only and never exercises the exit-75 path.
 
 ## Review conventions
 

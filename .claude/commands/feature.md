@@ -25,10 +25,15 @@ $ARGUMENTS
 3. Explore read-only, in parallel, into a ranked worklist of PR-sized batches.
 4. Build primitive-first: one reusable primitive with its first real caller. No
    abstraction before a consumer.
-5. **Prove it.** `bin/setup` after any dependency change, then `bin/check`, which here is
-   `uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`.
-   Red is not a pull request: fix the cause, never silence the gate. Add the failing test
-   first — a green run that never went red proves nothing.
+5. **Prove it.** `bin/setup` after any dependency change, then `bin/check`, which here
+   prepares the environment (`uv sync --extra dev`) and then grades with
+   `uv run ruff check src tests` and `uv run pytest tests/ --ignore=tests/integration -v`.
+   Exit 75 means the environment was unreachable and the change was never graded — that
+   is the environment's fault, not the change's. Exit 1 means the change is red. Red is
+   not a pull request: fix the cause, never silence the gate. Add the failing test
+   first — a green run that never went red proves nothing. CI runs the same two
+   commands itself as separate steps — it does not invoke `bin/check`, so the exit-75
+   path is local only.
 6. **One pull request in flight, start to finish.** Open it, watch it to merged, run
    `git fetch`, and only then start the next. Each merge rebases the base under the
    other, and green-when-opened is not green-to-merge.

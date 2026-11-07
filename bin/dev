@@ -1,5 +1,482 @@
 #!/usr/bin/env bash
 # one-command dev — established by dz-runner setup mode. One command; adjust as the repo grows.
+#
+# Starts the HTTP/SSE MCP server in the foreground. It runs until it is stopped
+# (Ctrl-C, SIGTERM, or the platform ending the run) and tears down the server,
+# the virtual display and its temp files on the way out — bin/dev owns that
+# cleanup, so nothing else has to stop it.
+#
+# Defaults match the documented run command: 127.0.0.1:8765 with the password
+# "onboarding-check". Override with HOST, PORT or PASSWORD when a fixed port is
+# not usable.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-xvfb-run -a uv run gaming-agent serve --transport http --host 127.0.0.1 --port 8765 --password onboarding-check
+
+HOST="${HOST:-127.0.0.1}"
+PORT="${PORT:-8765}"
+PASSWORD="${PASSWORD:-onboarding-check}"
+
+# Exit 75 means "a resource this command needs is unreachable" — the environment
+# is at fault, not the code. See .claude/skills/verify-change/SKILL.md.
+EXIT_ENV_UNREACHABLE=75
+
+# uv installs the project environment; mise shims are the usual location, but
+# fall back to the plain install paths bin/setup knows about.
+if ! command -v uv >/dev/null 2>&1; then
+  for candidate in \
+    "$HOME/.local/share/mise/shims" \
+    "$HOME/.local/bin" \
+    "$HOME/.cargo/bin" \
+    "/usr/local/bin"; do
+    if [ -x "$candidate/uv" ]; then
+      PATH="$candidate:$PATH"
+      export PATH
+      break
+    fi
+  done
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "dev: uv is not installed. Run ./bin/setup first." >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+server_cmd=(uv run gaming-agent serve --transport http
+  --host "$HOST" --port "$PORT" --password "$PASSWORD")
+
+# --- port preflight -------------------------------------------------------
+# A busy port must not surface as a raw uvicorn traceback. If our own server
+# is already answering /health there the dev stack is up and the launcher is
+# idempotent; anything else on the port is an environment problem.
+port_in_use() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "sport = :${PORT}" 2>/dev/null | grep -q "^LISTEN"
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    return 1
+  fi
+}
+
+# Fetch the body of GET /health. curl is preferred when it is installed, but
+# it is not a package bin/setup installs, so a fresh checkout may not have it.
+# The fallback is a plain bash /dev/tcp request: bash itself is already
+# required to run this script, so the probe works with nothing else present.
+# Both paths print the response body on stdout and fail when they cannot get
+# one.
+health_body() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS -m 2 "http://${HOST}:${PORT}/health" 2>/dev/null || return 1
+    return 0
+  fi
+
+  local line body="" in_body=0
+  # bash prints its own "connect: Connection refused" when the /dev/tcp
+  # redirection fails, and that message is not covered by a redirection on the
+  # exec itself — the braced group swallows it so a refused connection stays
+  # as quiet as it was with curl.
+  { exec 3<>"/dev/tcp/${HOST}/${PORT}"; } 2>/dev/null || return 1
+  if ! printf 'GET /health HTTP/1.1\r\nHost: %s:%s\r\nConnection: close\r\n\r\n' \
+    "$HOST" "$PORT" >&3; then
+    exec 3<&- 2>/dev/null || true
+    exec 3>&- 2>/dev/null || true
+    return 1
+  fi
+  # `read` returns false at EOF even when it read a partial last line, so the
+  # `|| [ -n "$line" ]` keeps that line. The whole probe is bounded to the same
+  # two seconds curl gets with -m 2, so a socket that accepts but never
+  # answers — or dribbles bytes one at a time — cannot stall the launcher.
+  local deadline=$((SECONDS + 2))
+  while :; do
+    local remaining=$((deadline - SECONDS))
+    [ "$remaining" -gt 0 ] || break
+    if IFS= read -r -t "$remaining" line <&3 || [ -n "$line" ]; then
+      if [ "$in_body" -eq 1 ]; then
+        body+="$line"$'\n'
+      elif [ "$line" = $'\r' ]; then
+        # The blank line after the headers ends the header block.
+        in_body=1
+      fi
+      line=""
+    else
+      # Read timed out with nothing pending.
+      break
+    fi
+  done
+  exec 3<&- 2>/dev/null || true
+  exec 3>&- 2>/dev/null || true
+  [ -n "$body" ] || return 1
+  printf '%s' "$body"
+}
+
+# The version this checkout serves, read from the package source so it can
+# never drift from the code that is running.
+expected_version() {
+  local init_file="src/ai_gaming_agent/__init__.py"
+  [ -f "$init_file" ] || return 1
+  local version
+  version="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' "$init_file" | head -n 1)"
+  [ -n "$version" ] || return 1
+  printf '%s' "$version"
+}
+
+# True when a /health body is OUR server: healthy, and carrying the version
+# this checkout serves. A foreign service on the same port may answer
+# {"status":"ok"} or {"status":"down","version":"1"} — neither is our stack,
+# and treating it as one leaves the dev server down while the launcher
+# reports success.
+is_our_server() {
+  local body="$1"
+  local version
+  version="$(expected_version)" || return 1
+  [ -n "$version" ] || return 1
+  # Compare without whitespace so the JSON layout cannot hide a match.
+  body="${body//[[:space:]]/}"
+  [[ "$body" == *'"status":"ok"'* ]] || return 1
+  [[ "$body" == *"\"version\":\"${version}\""* ]]
+}
+
+if body="$(health_body)"; then
+  if is_our_server "$body"; then
+    echo "dev: an AI Gaming Agent server is already serving on ${HOST}:${PORT} — nothing to do."
+    exit 0
+  fi
+  echo "dev: ${HOST}:${PORT} answers, but not with this checkout's health payload:" >&2
+  echo "dev:   ${body}" >&2
+  echo "dev: stop it, or run with PORT=<free-port> ./bin/dev" >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+if port_in_use; then
+  echo "dev: port ${PORT} is already in use by another process." >&2
+  echo "dev: stop it, or run with PORT=<free-port> ./bin/dev" >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+# --- display --------------------------------------------------------------
+# The server imports pyautogui, which needs a DISPLAY at import time. Prefer a
+# real desktop, then xvfb-run, then a hand-rolled Xvfb (xvfb-run additionally
+# needs the xauth binary, which is not installed everywhere).
+XVFB_PID=""
+SERVER_PID=""
+AUTH_FILE=""
+XVFB_LOG=""
+
+# Tear down everything this script started: the MCP server, the virtual
+# display it was given and the temporary files they used.
+cleanup() {
+  local status=$?
+  if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    # Signal the whole group: `uv run` wraps the real server in a child
+    # process that would otherwise survive the wrapper.
+    kill -TERM "-$SERVER_PID" 2>/dev/null || kill -TERM "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+  if [ -n "$XVFB_PID" ] && kill -0 "$XVFB_PID" 2>/dev/null; then
+    kill "$XVFB_PID" 2>/dev/null || true
+    wait "$XVFB_PID" 2>/dev/null || true
+  fi
+  [ -n "$AUTH_FILE" ] && rm -f "$AUTH_FILE"
+  [ -n "$XVFB_LOG" ] && rm -f "$XVFB_LOG"
+  return $status
+}
+trap cleanup EXIT
+trap 'trap - EXIT; cleanup; exit 130' INT
+trap 'trap - EXIT; cleanup; exit 143' TERM
+
+# Start a command in its own process group when setsid is available, so the
+# whole tree (including the python process behind the `uv run` wrapper) can be
+# signalled as one unit by cleanup.
+start_detached() {
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" &
+  else
+    "$@" &
+  fi
+  SERVER_PID=$!
+}
+
+free_display_number() {
+  local n
+  for n in $(seq 90 120); do
+    if [ ! -e "/tmp/.X${n}-lock" ] && [ ! -e "/tmp/.X11-unix/X${n}" ]; then
+      echo "$n"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# The X client used to probe a display: python-xlib, the same library
+# pyautogui opens the display with. It exits 0 when an authenticated
+# connection succeeded, 1 when the display refused us, and 3 when the
+# environment has no X client at all.
+X_PROBE_SCRIPT='import sys
+try:
+    import Xlib.display
+except Exception:
+    sys.exit(3)
+try:
+    display = Xlib.display.Display()
+except Exception:
+    sys.exit(1)
+display.close()
+sys.exit(0)'
+
+# Seconds an X probe may run before it is killed and its display is treated
+# as unreachable. A socket that accepts the connection but never completes
+# the handshake would otherwise hold the probe — and with it the fallback
+# below and start_xvfb's 20-second deadline — forever. The bound sits well
+# under that deadline, so a timed-out probe still leaves the loop room to
+# act on what it learned.
+X_PROBE_TIMEOUT=5
+
+# True while the probe job $1 is still running. kill -0 also succeeds for a
+# child that already exited but has not been reaped yet, so the shell's own
+# job table is asked as well (the same pattern xvfb_running uses).
+_probe_running() {
+  kill -0 "$1" 2>/dev/null || return 1
+  local job_pid
+  for job_pid in $(jobs -p 2>/dev/null); do
+    [ "$job_pid" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Wait at most $X_PROBE_TIMEOUT seconds for the probe running as background
+# job $1, then kill it and report 124 — the exit code the timeout tool uses —
+# so callers see one code for "the probe overran its bound" on both paths.
+# Without setsid the probe shares THIS script's process group, so a bare
+# group signal would name the launcher itself; the plain pid kill is the
+# safe fallback there.
+_bound_probe_wait() {
+  local pid="$1"
+  local deadline=$((SECONDS + X_PROBE_TIMEOUT))
+  while _probe_running "$pid" && [ "$SECONDS" -lt "$deadline" ]; do
+    sleep 0.1
+  done
+  if ! _probe_running "$pid"; then
+    wait "$pid" 2>/dev/null
+    return $?
+  fi
+  kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  local grace=0
+  while _probe_running "$pid" && [ "$grace" -lt 20 ]; do
+    sleep 0.1
+    grace=$((grace + 1))
+  done
+  kill -KILL "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null
+  return 124
+}
+
+# Probe an AUTHENTICATED X connection to $1, bounded: the probe process is
+# killed after $X_PROBE_TIMEOUT seconds and its overrun counts as a refusal.
+#   0  the display accepted us
+#   1  the display refused us — a handshake that never completes included
+#   3  no X client is available to probe with
+x_probe() {
+  local display="$1"
+  local rc=0
+  if command -v timeout >/dev/null 2>&1; then
+    # The timeout tool runs the probe in a process group of its own and
+    # signals the whole group at the bound, so the python process behind
+    # `uv run` cannot outlive it.
+    DISPLAY="$display" timeout "$X_PROBE_TIMEOUT" \
+      uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 || rc=$?
+  else
+    if command -v setsid >/dev/null 2>&1; then
+      DISPLAY="$display" setsid uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 &
+    else
+      DISPLAY="$display" uv run python -c "$X_PROBE_SCRIPT" >/dev/null 2>&1 &
+    fi
+    _bound_probe_wait "$!" || rc=$?
+  fi
+  case "$rc" in
+    0) return 0 ;;
+    3) return 3 ;;
+    *) return 1 ;;
+  esac
+}
+
+# True when a client can open an AUTHENTICATED X connection to $1.
+#
+# A DISPLAY that is set but unusable is an environment failure, not an
+# application failure: the server would otherwise die with a raw Xlib
+# traceback and exit 1, which reads as "the change is red". The socket on
+# its own proves nothing — a display whose authorization cookie we do not
+# hold answers the connection request with "Authorization required" — so the
+# probe decides, and only a display that cannot be probed at all falls back
+# to the socket check.
+display_reachable() {
+  local display="$1"
+
+  local rc=0
+  x_probe "$display" || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    1) return 1 ;;
+  esac
+
+  # No X client to probe with (rc 3). A local display must at least have its
+  # socket; a remote one has no local socket to look at, so trust it.
+  case "$display" in
+    :*)
+      local number="${display#:}"
+      number="${number%%.*}"
+      case "$number" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      if [ -S "/tmp/.X11-unix/X${number}" ]; then
+        return 0
+      fi
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+# A 128-bit MIT-MAGIC-COOKIE-1 value for the virtual display. mcookie is the
+# canonical source; od reads the same randomness when it is not installed.
+generate_cookie() {
+  local cookie=""
+  if command -v mcookie >/dev/null 2>&1; then
+    cookie="$(mcookie 2>/dev/null || true)"
+  fi
+  if [ -z "$cookie" ]; then
+    cookie="$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+  fi
+  [ -n "$cookie" ] || return 1
+  printf '%s' "$cookie"
+}
+
+# True while the Xvfb process is still up. `kill -0` also succeeds for a
+# child that already exited but has not been reaped yet, so ask the shell's
+# own job table as well: a dead X server must not be waited for until the
+# deadline.
+xvfb_running() {
+  kill -0 "$XVFB_PID" 2>/dev/null || return 1
+  local job_pid
+  for job_pid in $(jobs -p 2>/dev/null); do
+    if [ "$job_pid" = "$XVFB_PID" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+start_xvfb() {
+  local display_number="$1"
+  local log_file="$2"
+
+  # No -ac here: access control stays switched on, so only a client holding
+  # the cookie below can reach the virtual desktop. With -ac any local user
+  # could capture the screen and inject input into the automation.
+  Xvfb ":${display_number}" -screen 0 1024x768x24 -nolisten tcp \
+    -auth "$AUTH_FILE" >"$log_file" 2>&1 &
+  XVFB_PID=$!
+
+  # Wait until the display answers an AUTHENTICATED connection: that proves
+  # both that the server is up and that our cookie is the one it accepts.
+  local deadline=$((SECONDS + 20))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if ! xvfb_running; then
+      return 1
+    fi
+    local rc=0
+    x_probe ":${display_number}" || rc=$?
+    case "$rc" in
+      0)
+        # The display answered — but only trust that while the X server is
+        # still up: it may have died while the probe ran.
+        sleep 0.1
+        if xvfb_running; then
+          return 0
+        fi
+        return 1
+        ;;
+      3)
+        # No X client to probe with: the socket is all we can check.
+        if [ -S "/tmp/.X11-unix/X${display_number}" ]; then
+          return 0
+        fi
+        ;;
+    esac
+    sleep 0.2
+  done
+  return 1
+}
+
+if [ -n "${DISPLAY:-}" ] && display_reachable "$DISPLAY"; then
+  exec "${server_cmd[@]}"
+fi
+
+if [ -n "${DISPLAY:-}" ]; then
+  echo "dev: DISPLAY=${DISPLAY} did not accept an authenticated X connection — falling back to a virtual display." >&2
+fi
+
+if command -v xvfb-run >/dev/null 2>&1 && command -v xauth >/dev/null 2>&1; then
+  # xvfb-run gives the server its own authority cookie, so the virtual
+  # display is authenticated too.
+  #
+  # Give the server its own process group so cleanup can signal the whole
+  # tree, including the python process behind the `uv run` wrapper.
+  start_detached xvfb-run -a "${server_cmd[@]}"
+  wait "$SERVER_PID"
+  exit $?
+fi
+
+if command -v Xvfb >/dev/null 2>&1; then
+  display_number="$(free_display_number)" || {
+    echo "dev: no free X display number between :90 and :120." >&2
+    exit "$EXIT_ENV_UNREACHABLE"
+  }
+
+  # Xlib refuses a display without a valid authority cookie, so the cookie
+  # has to exist before Xvfb starts — and the same file has to reach the
+  # server, which is what XAUTHORITY below does.
+  if ! command -v xauth >/dev/null 2>&1; then
+    echo "dev: xauth is not installed, so the virtual display cannot be given an authority cookie." >&2
+    echo "dev: install xauth (./bin/setup) or run with DISPLAY set to a live X server." >&2
+    exit "$EXIT_ENV_UNREACHABLE"
+  fi
+
+  cookie="$(generate_cookie)" || {
+    echo "dev: could not generate an X authority cookie for the virtual display." >&2
+    exit "$EXIT_ENV_UNREACHABLE"
+  }
+
+  AUTH_FILE="$(mktemp "${TMPDIR:-/tmp}/gaming-agent-xauth.XXXXXX")"
+  XVFB_LOG="$(mktemp "${TMPDIR:-/tmp}/gaming-agent-xvfb.XXXXXX")"
+
+  # Xlib refuses to read a missing authority file, so create one and put the
+  # cookie in it. A failure here is fatal: an Xvfb without a usable cookie
+  # would start but refuse every client, including ours.
+  if ! XAUTHORITY="$AUTH_FILE" xauth source - >/dev/null 2>&1 <<EOF
+add :${display_number} MIT-MAGIC-COOKIE-1 ${cookie}
+EOF
+  then
+    echo "dev: could not write the X authority cookie to ${AUTH_FILE}." >&2
+    exit "$EXIT_ENV_UNREACHABLE"
+  fi
+  export XAUTHORITY="$AUTH_FILE"
+
+  if ! start_xvfb "$display_number" "$XVFB_LOG"; then
+    echo "dev: Xvfb failed to start on :${display_number}." >&2
+    sed -n '1,20p' "$XVFB_LOG" >&2 || true
+    exit "$EXIT_ENV_UNREACHABLE"
+  fi
+
+  export DISPLAY=":${display_number}"
+  echo "dev: virtual display ${DISPLAY} (pid ${XVFB_PID})"
+
+  # Give the server its own process group so cleanup can signal the whole
+  # tree, including the python process behind the `uv run` wrapper.
+  start_detached "${server_cmd[@]}"
+  wait "$SERVER_PID"
+  exit $?
+fi
+
+echo "dev: no display available." >&2
+echo "dev: install xvfb and xauth (./bin/setup) or run with DISPLAY set to a live X server." >&2
+exit "$EXIT_ENV_UNREACHABLE"
