@@ -31,7 +31,7 @@ Example with server setup:
     $ gaming-agent serve
 
     # Terminal 2: Run this demo
-    $ python examples/terminal_demo.py --password secret
+    $ python apps/ai-gaming-agent-mcp/examples/terminal_demo.py --password secret
 """
 
 from __future__ import annotations

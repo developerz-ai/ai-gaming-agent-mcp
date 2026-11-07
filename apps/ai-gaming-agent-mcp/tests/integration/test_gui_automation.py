@@ -6,7 +6,7 @@ These tests perform REAL actions on your desktop:
 - Type text
 - Open/close applications
 
-Run locally only: uv run pytest tests/integration -v
+Run locally only: cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
 
 Requirements:
 - A display (X11, Wayland with XWayland, Windows, macOS)

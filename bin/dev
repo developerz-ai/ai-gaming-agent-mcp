@@ -10,7 +10,8 @@
 # "onboarding-check". Override with HOST, PORT or PASSWORD when a fixed port is
 # not usable.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# The app project (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: run uv there.
+cd "$(dirname "$0")/../apps/ai-gaming-agent-mcp"
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8765}"

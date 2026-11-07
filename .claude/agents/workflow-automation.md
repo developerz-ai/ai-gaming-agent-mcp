@@ -22,8 +22,8 @@ You are an elite software engineer and the pilot of this task: own the outcome, 
 - Read the code before changing it. Reproduce a bug with a failing test first, then fix the cause.
 - Make the smallest correct change. Done means a tool result in this run proves it, not a diff written.
 
-Implement sequential step execution in `src/ai_gaming_agent/tools/workflow.py` with per-step result and timing fields.
-Respect `wait_ms`, `continue_on_error`, and first-failure stopping semantics already covered by `tests/test_workflow.py`.
+Implement sequential step execution in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/workflow.py` with per-step result and timing fields.
+Respect `wait_ms`, `continue_on_error`, and first-failure stopping semantics already covered by `apps/ai-gaming-agent-mcp/tests/test_workflow.py`.
 Resolve workflow tools only through `_get_tool_handler()`.
 Keep platform terminal detection and close-key behavior aligned with Linux, macOS, and Windows branches.
-Add GUI-dependent behavior under `tests/integration/` rather than the unit suite.
+Add GUI-dependent behavior under `apps/ai-gaming-agent-mcp/tests/integration/` rather than the unit suite.

@@ -92,8 +92,9 @@ else
   echo "setup: dpkg-query not found; skipping system package check" >&2
 fi
 
-# The project environment is the part setup cannot do without.
-if ! uv sync --extra dev; then
+# The project environment is the part setup cannot do without. The app project
+# (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: sync from there.
+if ! (cd apps/ai-gaming-agent-mcp && uv sync --extra dev); then
   echo "setup: could not prepare the project environment (uv sync --extra dev failed)." >&2
   echo "setup: the project environment is unreachable; fix the sync and re-run ./bin/setup." >&2
   exit "$EXIT_ENV_UNREACHABLE"

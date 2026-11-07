@@ -31,8 +31,7 @@ The server will be available at `http://localhost:8765`
 In another terminal, run an example script:
 
 ```bash
-cd examples
-uv run terminal_demo.py --password mypassword
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
 ```
 
 ## Examples
@@ -53,19 +52,19 @@ A complete example that demonstrates the end-to-end workflow:
 
 ```bash
 # Run with default command "echo hello world"
-uv run terminal_demo.py --password mypassword
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
 
 # Run with custom command
-uv run terminal_demo.py --password mypassword --command "ls -la"
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --command "ls -la"
 
 # Keep terminal open (don't close after command)
-uv run terminal_demo.py --password mypassword --keep-open
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --keep-open
 
 # Use custom server
-uv run terminal_demo.py --url http://192.168.1.100:8765 --password secret
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password secret
 
 # Verbose output for debugging
-uv run terminal_demo.py --password mypassword -v
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword -v
 ```
 
 #### Features Demonstrated
@@ -137,10 +136,10 @@ The easiest way to run examples (uses project's dependencies):
 
 ```bash
 # List available examples
-ls examples/
+ls apps/ai-gaming-agent-mcp/examples/
 
 # Run terminal demo
-uv run examples/terminal_demo.py --password mypassword
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
 ```
 
 ### Using Python Directly
@@ -149,13 +148,13 @@ If you have the dependencies installed globally:
 
 ```bash
 pip install mcp httpx
-python examples/terminal_demo.py --password mypassword
+cd apps/ai-gaming-agent-mcp && python examples/terminal_demo.py --password mypassword
 ```
 
-### From within examples directory
+### From within the examples directory
 
 ```bash
-cd examples
+cd apps/ai-gaming-agent-mcp/examples
 uv run terminal_demo.py --password mypassword
 ```
 
@@ -244,10 +243,10 @@ gaming-agent init --password newpassword
 **Solution:** Check server URL:
 ```bash
 # For local server
-uv run examples/terminal_demo.py --url http://localhost:8765 --password mypassword
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://localhost:8765 --password mypassword
 
 # For remote server
-uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password mypassword
+cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password mypassword
 ```
 
 ### Screenshot Save Failed
@@ -266,7 +265,7 @@ chmod 755 screenshots
 1. **Read the main README** for an overview of the AI Gaming Agent
 2. **Check docs/workflow.md** for detailed workflow documentation
 3. **Review tools.txt** for the complete tool reference
-4. **Explore the source code** in `src/ai_gaming_agent/`
+4. **Explore the source code** in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/`
 
 ## Examples for Other Use Cases
 

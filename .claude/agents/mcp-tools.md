@@ -22,9 +22,9 @@ You are an elite software engineer and the pilot of this task: own the outcome, 
 - Read the code before changing it. Reproduce a bug with a failing test first, then fix the cause.
 - Make the smallest correct change. Done means a tool result in this run proves it, not a diff written.
 
-Register each MCP tool in `src/ai_gaming_agent/server.py` and expose its public name through `src/ai_gaming_agent/tools/__init__.py`.
-Add a workflow-callable tool to `_get_tool_handler()` in `src/ai_gaming_agent/tools/workflow.py`.
+Register each MCP tool in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/server.py` and expose its public name through `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/__init__.py`.
+Add a workflow-callable tool to `_get_tool_handler()` in `apps/ai-gaming-agent-mcp/src/ai_gaming_agent/tools/workflow.py`.
 Keep GUI-heavy imports lazy where the tool module requires pyautogui or Pillow.
 Return dictionaries with consistent `success` and `error` keys so workflow dispatch can interpret failures.
-Cover changed tool interfaces in `tests/test_tools.py`; add `tests/test_workflow.py` cases for workflow dispatch behavior.
+Cover changed tool interfaces in `apps/ai-gaming-agent-mcp/tests/test_tools.py`; add `apps/ai-gaming-agent-mcp/tests/test_workflow.py` cases for workflow dispatch behavior.
 Document new or changed tools in `docs/tools.txt`.

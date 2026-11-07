@@ -22,7 +22,9 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# bin/ lives at the repository root; the app (src/, tests/) under apps/ai-gaming-agent-mcp.
+APP_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = APP_ROOT.parents[1]
 
 # The lint and unit-test commands the gate grades with. CI runs these two
 # itself as separate steps — it never invokes bin/check.
@@ -277,7 +279,7 @@ def _dev_sandbox(
 
 def _package_version() -> str:
     """The version the launcher reads out of the package source."""
-    source = (REPO_ROOT / "src" / "ai_gaming_agent" / "__init__.py").read_text()
+    source = (APP_ROOT / "src" / "ai_gaming_agent" / "__init__.py").read_text()
     match = re.search(r'^__version__\s*=\s*"([^"]+)"', source, re.MULTILINE)
     assert match is not None, "the package source must declare __version__"
     return match.group(1)

@@ -18,7 +18,8 @@
 # 127 ("command not found"), which the platform reads as "the change is red"
 # and throws away correct work.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# The app project (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: run uv there.
+cd "$(dirname "$0")/../apps/ai-gaming-agent-mcp"
 
 # Exit 75 means "a resource this command needs is unreachable" — the
 # environment is at fault, not the code. See .claude/skills/verify-change/SKILL.md.

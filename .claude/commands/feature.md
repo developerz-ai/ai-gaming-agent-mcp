@@ -26,7 +26,7 @@ $ARGUMENTS
 4. Build primitive-first: one reusable primitive with its first real caller. No
    abstraction before a consumer.
 5. **Prove it.** `bin/setup` after any dependency change, then `bin/check`, which here
-   prepares the environment (`uv sync --extra dev`) and then grades with
+   runs inside `apps/ai-gaming-agent-mcp` (where the app's pyproject.toml and uv.lock live), prepares the environment (`uv sync --extra dev`) and then grades with
    `uv run ruff check src tests` and `uv run pytest tests/ --ignore=tests/integration -v`.
    Exit 75 means the environment was unreachable and the change was never graded — that
    is the environment's fault, not the change's. Exit 1 means the change is red. Red is

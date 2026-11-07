@@ -58,7 +58,7 @@
 
 ## `smoke_test` — ok
 
-- tests/test_workflow.py in the repository
+- apps/ai-gaming-agent-mcp/tests/test_workflow.py in the repository
 - run by ./bin/check exited 0 at head (4.2s)
 
 ## `env_example` — ok

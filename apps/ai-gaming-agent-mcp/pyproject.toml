@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-gaming-agent"
+version = "0.2.0"
+description = "MCP server for remote PC automation - enables AI agents to control gaming PCs"
+readme = { text = "MCP server for remote PC automation - enables AI agents to control gaming PCs", content-type = "text/markdown" }
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "DeveloperZ AI" }
+]
+keywords = ["mcp", "automation", "gaming", "ai", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+    "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+    "mcp>=1.0.0",
+    "pyautogui>=0.9.54",
+    "pillow>=10.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "screeninfo>=0.8.1",
+    "psutil>=6.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyperclip>=1.8.0",
+]
+
+[project.optional-dependencies]
+vlm = [
+    "ollama>=0.4.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+integration = [
+    "pytest>=8.0.0",
+    "pytesseract>=0.3.10",
+]
+
+[project.scripts]
+gaming-agent = "ai_gaming_agent.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/developerz-ai/ai-gaming-agent-mcp"
+Repository = "https://github.com/developerz-ai/ai-gaming-agent-mcp"
+Issues = "https://github.com/developerz-ai/ai-gaming-agent-mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_gaming_agent"]
+
+# This app is its own uv workspace root: uv resolves, locks and installs here,
+# so the lockfile stays at apps/ai-gaming-agent-mcp/uv.lock. Run uv from this
+# directory, never from the repository root.
+[tool.uv.workspace]
+members = []
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (require display, run locally only)",
+]
