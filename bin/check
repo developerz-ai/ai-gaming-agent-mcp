@@ -1,6 +1,80 @@
 #!/usr/bin/env bash
-# one-command check (typecheck + lint + test) — established by dz-runner setup mode. One command; adjust as the repo grows.
+# one-command check (lint + unit tests) — established by dz-runner setup mode.
+# One command; adjust as the repo grows.
+#
+# This is the LOCAL repository gate: .githooks/pre-commit runs it. CI
+# (.github/workflows/ci.yml) does NOT invoke this script — it runs the same two
+# commands itself as separate steps, so a change that passes here passes CI's
+# lint and unit tests. Integration tests stay excluded from both (they need a
+# real display and are local only).
+#
+# Exit codes follow .claude/skills/verify-change/SKILL.md:
+#   0  the change passes
+#   75 a resource the gate NEEDS is unreachable — the gate refused to grade,
+#      so the environment is at fault, never the change
+#   any other non-zero  the gate ran and the change is red
+#
+# Guarding preconditions FIRST matters: without it a missing toolchain exits
+# 127 ("command not found"), which the platform reads as "the change is red"
+# and throws away correct work.
 set -euo pipefail
 # The app project (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: run uv there.
 cd "$(dirname "$0")/../apps/ai-gaming-agent-mcp"
-uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v
+
+# Exit 75 means "a resource this command needs is unreachable" — the
+# environment is at fault, not the code. See .claude/skills/verify-change/SKILL.md.
+EXIT_ENV_UNREACHABLE=75
+
+# --- preconditions ---------------------------------------------------------
+# Everything in this section is about whether the gate CAN run. Nothing here
+# may blame the change, so every failure exits 75.
+
+# uv is the only tool the gate needs: it provides both ruff and pytest via the
+# project environment. mise manages it when available, but the shell may not
+# have sourced the mise shims yet, so look in the plain install paths too.
+if ! command -v uv >/dev/null 2>&1; then
+  for candidate in \
+    "$HOME/.local/share/mise/shims" \
+    "$HOME/.local/bin" \
+    "$HOME/.cargo/bin" \
+    "/usr/local/bin"; do
+    if [ -x "$candidate/uv" ]; then
+      PATH="$candidate:$PATH"
+      export PATH
+      break
+    fi
+  done
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "check: uv is not installed, so the gate cannot run." >&2
+  echo "check: install uv (https://docs.astral.sh/uv/) or run ./bin/setup, then re-run." >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+# The project environment must exist and be satisfiable before ruff or pytest
+# can run. A dependency that cannot be resolved is an environment problem, so
+# it exits 75 rather than being reported as a red change.
+if ! uv sync --extra dev; then
+  echo "check: could not prepare the project environment (uv sync --extra dev failed)." >&2
+  echo "check: run ./bin/setup and re-run; the change itself was not graded." >&2
+  exit "$EXIT_ENV_UNREACHABLE"
+fi
+
+# --- grading ---------------------------------------------------------------
+# From here on the gate CAN run, so every failure is the change being red.
+# The commands are the ones CI runs directly and the pre-commit hook runs here.
+
+echo "check: linting (ruff)…"
+if ! uv run ruff check src tests; then
+  echo "check: ruff reported lint errors." >&2
+  exit 1
+fi
+
+echo "check: unit tests (pytest, integration excluded)…"
+if ! uv run pytest tests/ --ignore=tests/integration -v; then
+  echo "check: the unit test suite failed." >&2
+  exit 1
+fi
+
+echo "check: ok — lint and unit tests pass."
