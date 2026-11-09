@@ -12,6 +12,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,8 @@ from typing import TYPE_CHECKING, Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
+from mcp.server.auth.provider import AccessToken
 from mcp.server.sse import SseServerTransport
 
 from ai_gaming_agent import __version__
@@ -77,6 +80,50 @@ def validate_token(
     return credentials.credentials
 
 
+def _principal_for(token: str) -> AuthenticatedUser:
+    """Build the MCP principal that `token` authenticates as.
+
+    This server has one shared password, so every authenticated request is the
+    same principal, named here by a digest of that credential: the digest keeps
+    the password itself out of the ASGI scope while staying stable, so the SSE
+    endpoint and the POST endpoint derive the same identity from the same token.
+    ``AccessToken.token`` therefore holds a fingerprint, never the credential.
+
+    Args:
+        token: A bearer token that already passed `validate_token`.
+
+    Returns:
+        The principal to record in ``scope["user"]``.
+    """
+    fingerprint = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return AuthenticatedUser(AccessToken(token=fingerprint, client_id=fingerprint, scopes=["mcp"]))
+
+
+async def require_authenticated_principal(
+    request: Request,
+    token: str = Depends(validate_token),
+) -> None:
+    """Authenticate the request and record its principal in the ASGI scope.
+
+    The mcp SSE transport binds each session to the principal that opened it
+    and re-checks that principal on every posted message, but it only records
+    an owner for an `AuthenticatedUser` in ``scope["user"]``. Without this both
+    sides are ``None`` and the comparison is vacuous; with it, GET /mcp and
+    POST /mcp/messages record the same principal derived from the bearer token,
+    so the transport compares real principals and a session cannot be opened
+    without one being recorded for it.
+
+    This is not per-client isolation. One shared password yields one principal
+    for every client, so any holder of that password still matches every
+    session; separating clients requires per-client credentials.
+
+    Args:
+        request: The incoming HTTP request whose scope is annotated.
+        token: Validated Bearer token (dependency).
+    """
+    request.scope["user"] = _principal_for(token)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
@@ -131,7 +178,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     @app.get("/mcp")
     async def handle_sse(
         request: Request,
-        _token: str = Depends(validate_token),
+        _principal: None = Depends(require_authenticated_principal),
     ) -> Response:
         """Handle SSE connections for MCP.
 
@@ -141,7 +188,8 @@ def create_app(config: Config | None = None) -> FastAPI:
 
         Args:
             request: The incoming HTTP request.
-            _token: Validated Bearer token (dependency).
+            _principal: Authenticated principal (dependency); recorded in the
+                scope so the transport can bind the session to it.
 
         Returns:
             Empty response after SSE connection ends.
@@ -197,6 +245,10 @@ def create_app(config: Config | None = None) -> FastAPI:
             response = Response("Invalid authentication token", status_code=401)
             await response(scope, receive, send)
             return
+
+        # Record the same principal the SSE endpoint derives from this token so
+        # the transport can match this message to the session it opened.
+        scope["user"] = _principal_for(token)
 
         # Authentication passed, forward to SSE transport
         await _sse_transport.handle_post_message(scope, receive, send)

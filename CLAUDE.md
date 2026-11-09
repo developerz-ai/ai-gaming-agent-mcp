@@ -51,7 +51,7 @@ Master Claude (Orchestrator)
 |------|----------------|
 | Language | Python >=3.12 |
 | Package/build | uv, Hatchling |
-| MCP | `mcp>=1.0.0` |
+| MCP | `mcp>=1.30.0,<2` |
 | HTTP | FastAPI >=0.115, `uvicorn[standard]` >=0.32 |
 | Automation | PyAutoGUI >=0.9.54, Pillow >=10, pyperclip >=1.8 |
 | Configuration | Pydantic >=2, pydantic-settings >=2 |
