@@ -160,7 +160,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb scrot python3-tk python3-dev
       - working-directory: apps/ai-gaming-agent-mcp
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
       - working-directory: apps/ai-gaming-agent-mcp
         run: uv run ruff check src tests
       - working-directory: apps/ai-gaming-agent-mcp
@@ -174,6 +174,7 @@ jobs:
 3. **Linting**: ruff (fast, comprehensive)
 4. **Integration tests excluded**: `--ignore=tests/integration` (run from `apps/ai-gaming-agent-mcp`)
 5. **CI environment variable**: `CI=true` signals test skipping
+6. **Locked install**: CI runs `uv sync --locked --extra dev`, installing from the committed `uv.lock` and failing if the lock is out of date with `pyproject.toml`
 
 ## Writing New Tests
 

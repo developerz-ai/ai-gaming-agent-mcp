@@ -134,6 +134,21 @@ def test_app_sources_and_tests_live_in_the_app_directory():
     assert not (REPO_ROOT / "tests").exists(), "the app tests must not stay at the repository root"
 
 
+def test_ci_installs_dependencies_from_the_lockfile():
+    """CI must install from uv.lock and fail on lock drift, never re-resolve."""
+    workflow = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    assert workflow.is_file(), f"missing CI workflow: {workflow}"
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+
+    sync_lines = [line.strip() for line in lines if re.search(r"\buv\s+sync\b", line) and not line.lstrip().startswith("#")]
+    assert sync_lines, "the CI workflow must install dependencies with `uv sync`"
+    unlocked = [line for line in sync_lines if "--locked" not in line.split()]
+    assert not unlocked, f"every `uv sync` in the CI workflow must pass --locked: {unlocked}"
+    assert any(line.endswith("uv sync --locked --extra dev") for line in sync_lines), (
+        "the CI dependency step must run `uv sync --locked --extra dev`"
+    )
+
+
 def test_documented_commands_do_not_change_the_callers_working_directory():
     """A documented `cd ... && ...` must run inside a subshell.
 

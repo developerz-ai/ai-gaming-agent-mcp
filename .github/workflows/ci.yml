@@ -32,7 +32,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/ai-gaming-agent-mcp
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Lint with ruff
         working-directory: apps/ai-gaming-agent-mcp
