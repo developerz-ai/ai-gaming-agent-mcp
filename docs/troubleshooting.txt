@@ -81,6 +81,14 @@ Basic health check:
 
 Authenticated test:
   curl -H "Authorization: Bearer <password>" http://<IP>:8765/mcp
+  This only succeeds when the address the client sends is listed in
+  server.allowed_hosts (default: loopback only). A Host outside the list is
+  refused with 421 "Invalid Host header" before the SSE stream starts.
+  Add the PC's own address in the host:port form the client sends
+  (e.g. "192.168.1.100:8765") to server.allowed_hosts in config.json (the
+  GAMING_AGENT_SERVER__ALLOWED_HOSTS override only applies when no config
+  file exists), then restart the server.
+  GET /health is not Host-validated, so it still answers over the network.
 
 From Claude Desktop:
   Try calling screenshot tool - if it returns an image, connection works

@@ -189,7 +189,7 @@ class TestMcpMessagesEndpoint:
             response = client.post(
                 "/mcp/messages",
                 json={},
-                headers={"Authorization": "Bearer test-password"},
+                headers={"Authorization": "Bearer test-password", "Host": "localhost:8765"},
             )
 
         # Should fail with 400 because no session_id
@@ -205,7 +205,7 @@ class TestMcpMessagesEndpoint:
             response = client.post(
                 "/mcp/messages?session_id=invalid-uuid",
                 json={},
-                headers={"Authorization": "Bearer test-password"},
+                headers={"Authorization": "Bearer test-password", "Host": "localhost:8765"},
             )
 
         # Should fail with 400 for invalid UUID format
@@ -398,7 +398,10 @@ class TestSessionPrincipal:
         client, recording = self._recording_app(config)
 
         try:
-            response = client.get("/mcp", headers={"Authorization": "Bearer test-password"})
+            response = client.get(
+                "/mcp",
+                headers={"Authorization": "Bearer test-password", "Host": "localhost:8765"},
+            )
         finally:
             client.__exit__(None, None, None)
 
@@ -420,7 +423,7 @@ class TestSessionPrincipal:
             response = client.post(
                 "/mcp/messages",
                 json={},
-                headers={"Authorization": "Bearer test-password"},
+                headers={"Authorization": "Bearer test-password", "Host": "localhost:8765"},
             )
         finally:
             client.__exit__(None, None, None)
@@ -442,8 +445,12 @@ class TestSessionPrincipal:
         client, recording = self._recording_app(config)
 
         try:
-            client.get("/mcp", headers={"Authorization": "Bearer shared-secret"})
-            client.post("/mcp/messages", json={}, headers={"Authorization": "Bearer shared-secret"})
+            client.get("/mcp", headers={"Authorization": "Bearer shared-secret", "Host": "localhost:8765"})
+            client.post(
+                "/mcp/messages",
+                json={},
+                headers={"Authorization": "Bearer shared-secret", "Host": "localhost:8765"},
+            )
         finally:
             client.__exit__(None, None, None)
 
@@ -469,3 +476,237 @@ class TestSessionPrincipal:
         assert response.status_code == 401
         assert recording.posted_scopes == []
         assert recording.connected_scopes == []
+
+
+class TestTransportSecurity:
+    """Tests for the Host and Origin allow-list on the /mcp endpoints.
+
+    The transport refuses a request whose Host is outside
+    ``server.allowed_hosts`` (421) or whose Origin is outside
+    ``server.allowed_origins`` (403), and it refuses it before the request
+    reaches the SSE transport.
+    """
+
+    ALLOWED_HOST = "localhost:8765"
+    ALLOWED_ORIGIN = "http://localhost:8765"
+
+    @staticmethod
+    def _config() -> Config:
+        """Build a configuration with a password set."""
+        config = Config()
+        config.server.password = "test-password"
+        return config
+
+    @staticmethod
+    def _recording_app(config: Config):
+        """Build a client whose transport records every scope it receives."""
+        recording = _RecordingSseTransport()
+        client = TestClient(create_test_app(config))
+        client.__enter__()
+        # The lifespan builds the real transport; hand it the recorder instead.
+        from ai_gaming_agent import http_server
+
+        http_server._sse_transport = recording
+        return client, recording
+
+    def test_allowed_host_reaches_transport(self):
+        """An allowed Host and Origin are handled by the transport as before."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.get(
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": self.ALLOWED_HOST,
+                    "Origin": self.ALLOWED_ORIGIN,
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 200
+        assert len(recording.connected_scopes) == 1
+
+    def test_configured_allow_list_widens_the_transport(self):
+        """A Host the operator added to the allow-list is accepted."""
+        config = self._config()
+        config.server.allowed_hosts = ["localhost:*", "gaming.example.com:8765"]
+        client, recording = self._recording_app(config)
+
+        try:
+            response = client.get(
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": "gaming.example.com:8765",
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 200
+        assert len(recording.connected_scopes) == 1
+
+    def test_disallowed_host_rejected(self):
+        """A Host outside the allow-list is refused with 421 and never reaches the transport."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.get(
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": "evil.example.com",
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 421
+        assert "Invalid Host header" in response.text
+        assert recording.connected_scopes == []
+
+    def test_disallowed_origin_rejected(self):
+        """An Origin outside the allow-list is refused with 403 and never reaches the transport."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.get(
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": self.ALLOWED_HOST,
+                    "Origin": "http://evil.example.com",
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 403
+        assert "Invalid Origin header" in response.text
+        assert recording.connected_scopes == []
+
+    def test_post_disallowed_host_rejected(self):
+        """POST /mcp/messages refuses a disallowed Host before the transport."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": "evil.example.com",
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 421
+        assert "Invalid Host header" in response.text
+        assert recording.posted_scopes == []
+
+    def test_post_disallowed_origin_rejected(self):
+        """POST /mcp/messages refuses a disallowed Origin before the transport."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": self.ALLOWED_HOST,
+                    "Origin": "http://evil.example.com",
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 403
+        assert "Invalid Origin header" in response.text
+        assert recording.posted_scopes == []
+
+    def test_post_allowed_host_reaches_transport(self):
+        """POST /mcp/messages with an allowed Host is handed to the transport."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={
+                    "Authorization": "Bearer test-password",
+                    "Host": self.ALLOWED_HOST,
+                },
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 202
+        assert len(recording.posted_scopes) == 1
+
+    def test_missing_token_rejected_before_host_check(self):
+        """The bearer check stays first: a tokenless POST is 401, not a Host refusal."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={"Host": "evil.example.com"},
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 401
+        assert recording.posted_scopes == []
+
+    def test_missing_token_rejected_before_host_check_on_sse(self):
+        """A tokenless GET is refused by the bearer check, not by the Host check."""
+        client, recording = self._recording_app(self._config())
+
+        try:
+            response = client.get("/mcp", headers={"Host": "evil.example.com"})
+        finally:
+            client.__exit__(None, None, None)
+
+        # FastAPI's HTTPBearer answers 401 (or 403 in some versions) for a
+        # missing header; either way the Host check never pre-empts it.
+        assert response.status_code in [401, 403]
+        assert recording.connected_scopes == []
+
+    def test_health_is_not_host_validated(self):
+        """Health stays unauthenticated and unvalidated, whatever the Host says."""
+        app = create_test_app(self._config())
+
+        with TestClient(app) as client:
+            response = client.get("/health", headers={"Host": "evil.example.com"})
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    def test_transport_is_built_with_the_configured_allow_list(self):
+        """The SSE transport itself carries the allow-list, not only the pre-check.
+
+        Every other case in this class swaps in a transport that validates
+        nothing and lets the app-level pre-check answer the refusal, so a
+        transport built without these settings - or with DNS rebinding
+        protection disabled - would keep the whole class green while the real
+        SDK transport stayed unprotected. This pins the settings the transport
+        is actually constructed with.
+        """
+        config = self._config()
+        app = create_test_app(config)
+
+        from ai_gaming_agent import http_server
+
+        with patch.object(http_server, "SseServerTransport") as transport_cls:
+            with TestClient(app):
+                pass
+
+        settings = transport_cls.call_args.kwargs["security_settings"]
+        assert settings.enable_dns_rebinding_protection is True
+        assert settings.allowed_hosts == config.server.allowed_hosts
+        assert settings.allowed_origins == config.server.allowed_origins

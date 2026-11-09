@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 from mcp.server.auth.provider import AccessToken
 from mcp.server.sse import SseServerTransport
+from mcp.server.transport_security import TransportSecurityMiddleware, TransportSecuritySettings
 
 from ai_gaming_agent import __version__
 from ai_gaming_agent.config import Config
@@ -38,8 +40,41 @@ _mcp_server: Server | None = None
 _sse_transport: SseServerTransport | None = None
 _config: Config | None = None
 
+# Transport security (Host/Origin allow-list), shared by the SSE transport and
+# the request pre-check so both enforce exactly the same rules.
+_transport_security_settings: TransportSecuritySettings | None = None
+_transport_security: TransportSecurityMiddleware | None = None
+
 # Security scheme for Bearer token auth
 security = HTTPBearer()
+
+
+class _AsgiEndpoint:
+    """Serve a raw ASGI callable from a Starlette route.
+
+    Starlette's ``Route`` treats a plain function as a request handler and
+    calls it with a ``Request``; the MCP transport's message handler takes the
+    raw ASGI triple (scope, receive, send) instead. Wrapping the callable in
+    an object keeps the raw calling convention.
+    """
+
+    def __init__(self, app: Callable[[dict[str, Any], Any, Any], Any]) -> None:
+        """Store the raw ASGI callable to serve.
+
+        Args:
+            app: The raw ASGI callable to invoke for every request.
+        """
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle one ASGI event stream.
+
+        Args:
+            scope: The ASGI connection scope.
+            receive: The ASGI receive callable.
+            send: The ASGI send callable.
+        """
+        await self.app(scope, receive, send)
 
 
 def get_config() -> Config:
@@ -47,6 +82,44 @@ def get_config() -> Config:
     if _config is None:
         return Config.load()
     return _config
+
+
+def _build_transport_security_settings(config: Config) -> TransportSecuritySettings:
+    """Build the transport security settings for the configured allow-list.
+
+    The Host and Origin allow-lists come from the configuration, so an operator
+    can widen them; the defaults are loopback only.
+
+    Args:
+        config: Configuration to read the allow-lists from.
+
+    Returns:
+        Settings shared by the SSE transport and the request pre-check.
+    """
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=list(config.server.allowed_hosts),
+        allowed_origins=list(config.server.allowed_origins),
+    )
+
+
+async def _reject_disallowed_headers(request: Request) -> Response | None:
+    """Return a refusal response when the Host or Origin header is not allowed.
+
+    The SSE transport validates the same two headers, but its SSE path sends the
+    error response and then raises, which surfaces as a server error instead of
+    the refusal. Checking here answers 421 for a disallowed Host and 403 for a
+    disallowed Origin, and stops the request before it reaches the transport.
+
+    Args:
+        request: The incoming HTTP request.
+
+    Returns:
+        The refusal response, or None when both headers are allowed.
+    """
+    if _transport_security is None:
+        return None
+    return await _transport_security.validate_request(request, is_post=False)
 
 
 def validate_token(
@@ -134,8 +207,11 @@ async def lifespan(app: FastAPI):
     # Create MCP server
     _mcp_server = create_server(_config)
 
-    # Create SSE transport - messages will be posted to /mcp/messages
-    _sse_transport = SseServerTransport("/mcp/messages")
+    # Create SSE transport - messages will be posted to /mcp/messages.
+    # The same settings object drives the transport and the request pre-check,
+    # so the Host and Origin rules cannot drift between them.
+    settings = _transport_security_settings or _build_transport_security_settings(get_config())
+    _sse_transport = SseServerTransport("/mcp/messages", security_settings=settings)
 
     logger.info("MCP server initialized with SSE transport")
 
@@ -153,8 +229,13 @@ def create_app(config: Config | None = None) -> FastAPI:
     Returns:
         Configured FastAPI application.
     """
-    global _config
+    global _config, _transport_security_settings, _transport_security
     _config = config or Config.load()
+
+    # One settings object for the transport and the pre-check, so both enforce
+    # exactly the same Host and Origin rules.
+    _transport_security_settings = _build_transport_security_settings(_config)
+    _transport_security = TransportSecurityMiddleware(_transport_security_settings)
 
     app = FastAPI(
         title="AI Gaming Agent",
@@ -192,8 +273,13 @@ def create_app(config: Config | None = None) -> FastAPI:
                 scope so the transport can bind the session to it.
 
         Returns:
-            Empty response after SSE connection ends.
+            Empty response after SSE connection ends, or the refusal response
+            when the Host or Origin header is not allowed.
         """
+        refusal = await _reject_disallowed_headers(request)
+        if refusal is not None:
+            return refusal
+
         if _sse_transport is None or _mcp_server is None:
             raise HTTPException(status_code=503, detail="Server not initialized")
 
@@ -246,12 +332,27 @@ def create_app(config: Config | None = None) -> FastAPI:
             await response(scope, receive, send)
             return
 
+        # Refuse a disallowed Host or Origin before the message reaches the
+        # transport.
+        refusal = await _reject_disallowed_headers(request)
+        if refusal is not None:
+            await refusal(scope, receive, send)
+            return
+
         # Record the same principal the SSE endpoint derives from this token so
         # the transport can match this message to the session it opened.
         scope["user"] = _principal_for(token)
 
         # Authentication passed, forward to SSE transport
         await _sse_transport.handle_post_message(scope, receive, send)
+
+    # Serve "/mcp/messages" exactly. Starlette's Mount only matches paths below
+    # its mount point, so the mounted handler alone answers every message POST
+    # with a redirect to "/mcp/messages/" - and a redirect built from a Host
+    # header that differs from the URL host is cross-origin for the client,
+    # which drops the Authorization header on the way and hides the Host and
+    # Origin refusal behind an authentication error.
+    app.router.add_route("/mcp/messages", _AsgiEndpoint(mcp_post_handler), methods=["POST"])
 
     # Mount the POST handler at /mcp/messages
     app.mount("/mcp/messages", app=mcp_post_handler)

@@ -37,7 +37,9 @@ cat > ~/.gaming-agent/config.json << 'EOF'
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "your-secure-password-here"
+    "password": "your-secure-password-here",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   },
   "vlm": {
     "enabled": false,
@@ -70,7 +72,9 @@ EOF
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "your-secure-password-here"
+    "password": "your-secure-password-here",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   }
 }
 ```
@@ -80,6 +84,28 @@ EOF
 | `host` | string | `"0.0.0.0"` | IP address to bind to. Use `0.0.0.0` for all interfaces |
 | `port` | int | `8765` | Port number for MCP server |
 | `password` | string | `""` | Authentication password (required for remote access) |
+| `allowed_hosts` | list[str] | `["localhost:*", "127.0.0.1:*", "[::1]:*"]` | `Host` headers accepted by the MCP endpoints. Loopback only by default |
+| `allowed_origins` | list[str] | `["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]` | `Origin` headers accepted by the MCP endpoints. Loopback only by default |
+
+**Host and Origin rules**
+
+- A request whose `Host` header is not in `allowed_hosts` is refused with `421`
+  ("Invalid Host header") and never reaches the SSE transport.
+- A request whose `Origin` header is present and not in `allowed_origins` is
+  refused with `403` ("Invalid Origin header"). A request without an `Origin`
+  header is allowed.
+- An entry matches either exactly (`192.168.1.100:8765`) or, when it ends in
+  `:*`, any `host:port` form of that host (`192.168.1.100:*` matches
+  `192.168.1.100:8765`).
+- The wildcard covers `host:port` forms only: a value without a port
+  (`192.168.1.100`) is refused with `421` even when `192.168.1.100:*` is
+  listed, so a bare host needs its own exact entry.
+- The bearer token is checked first: a missing or wrong token is refused with
+  `401` (`403` when no password is configured) before any Host or Origin check.
+- `GET /health` is neither authenticated nor Host-validated.
+- A remote PC must therefore list its own address in `allowed_hosts`, for
+  example `"192.168.1.100:8765"`. Without it every `/mcp` request from that
+  client is refused with `421`.
 
 ### VLM Configuration (Optional)
 
@@ -165,12 +191,23 @@ export GAMING_AGENT_SERVER__HOST=127.0.0.1
 export GAMING_AGENT_SERVER__PORT=9000
 export GAMING_AGENT_SERVER__PASSWORD=secret
 
+# Host/Origin allow-lists (JSON array values)
+export GAMING_AGENT_SERVER__ALLOWED_HOSTS='["localhost:*","192.168.1.100:8765"]'
+export GAMING_AGENT_SERVER__ALLOWED_ORIGINS='["http://localhost:*","http://192.168.1.100:8765"]'
+
 # VLM settings
 export GAMING_AGENT_VLM__ENABLED=true
 export GAMING_AGENT_VLM__MODEL=qwen2.5-vl:7b
 ```
 
-Note: Use double underscore `__` for nested keys.
+Note: Use double underscore `__` for nested keys. `allowed_hosts` and
+`allowed_origins` take a JSON array as their value - a bare comma-separated
+string is rejected.
+
+Note: when `~/.gaming-agent/config.json` exists, its values are loaded as-is.
+A config file's `server.allowed_hosts` / `server.allowed_origins` win and are
+not merged with the environment; the environment overrides apply when there is
+no config file.
 
 ## CLI Override
 
@@ -221,7 +258,9 @@ This outputs the current configuration as JSON.
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "strong-random-password-here"
+    "password": "strong-random-password-here",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*", "192.168.1.100:8765"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   },
   "vlm": {
     "enabled": true,
@@ -257,7 +296,9 @@ This outputs the current configuration as JSON.
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "viewer-password"
+    "password": "viewer-password",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*", "192.168.1.100:8765"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   },
   "features": {
     "screenshot": true,
@@ -293,6 +334,24 @@ To connect Claude Desktop to your gaming PC, add this to:
         "Authorization": "Bearer different-password"
       }
     }
+  }
+}
+```
+
+Each PC must list its own address in its own `server.allowed_hosts` (and in
+`server.allowed_origins` if the client sends an `Origin` header). A remote PC
+that does not list itself refuses every `/mcp` request with `421 Invalid Host
+header` - the request never reaches the SSE transport, even with a valid
+bearer token. The matching config for `192.168.1.100` looks like this:
+
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8765,
+    "password": "your-secure-password-here",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*", "192.168.1.100:8765"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   }
 }
 ```

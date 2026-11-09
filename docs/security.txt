@@ -8,24 +8,51 @@ The system implements multiple security measures:
   1. Password/Token Authentication
      - Required for all connections
      - Validated on every request
+     - Checked first: an invalid token is refused with 401 before any
+       Host or Origin check runs
 
-  2. Path Restrictions
+  2. DNS-Rebinding Protection (transport layer)
+     - The Host and Origin headers of every /mcp request are validated
+       against the configured allow-lists
+     - Allowed hosts: server.allowed_hosts
+       (default: localhost:*, 127.0.0.1:*, [::1]:* - loopback only)
+     - Allowed origins: server.allowed_origins
+       (default: http://localhost:*, http://127.0.0.1:*, http://[::1]:* -
+       loopback only)
+     - A Host outside the allow-list is refused with 421
+       ("Invalid Host header") and never reaches the SSE transport
+     - An Origin outside the allow-list is refused with 403
+       ("Invalid Origin header") and never reaches the SSE transport
+     - An entry matches exactly, or any host:port form of that host when it
+       ends in ":*"
+     - The wildcard covers host:port forms only: "192.168.1.100:*" matches
+       "192.168.1.100:8765" but not the bare "192.168.1.100" or
+       "http://192.168.1.100", which need their own exact entries (otherwise
+       they are refused with 421/403)
+     - A remote PC must list its own address (e.g. 192.168.1.100:8765) or
+       every /mcp request from that client is refused with 421
+     - Environment overrides: GAMING_AGENT_SERVER__ALLOWED_HOSTS and
+       GAMING_AGENT_SERVER__ALLOWED_ORIGINS (JSON array values). A config
+       file's values win over them
+     - GET /health is neither authenticated nor Host-validated
+
+  3. Path Restrictions
      - File access limited to allowed directories
      - Prevents access to system files
 
-  3. Command Blocklist
+  4. Command Blocklist
      - Dangerous commands are blocked
      - Prevents system damage
 
-  4. Rate Limiting
+  5. Rate Limiting
      - Maximum requests per minute
      - Prevents abuse
 
-  5. Audit Logging
+  6. Audit Logging
      - All actions logged with timestamps
      - Enables review and forensics
 
-  6. TLS/HTTPS (Optional)
+  7. TLS/HTTPS (Optional)
      - Encrypts all traffic
      - Recommended for production
 
@@ -35,14 +62,18 @@ AUTHENTICATION FLOW
   1. Client sends HTTP request with Authorization header
   2. Header format: "Bearer <password>"
   3. Server validates password against config
-  4. If valid: establish SSE connection
-  5. If invalid: return 401 Unauthorized
+  4. If invalid: return 401 Unauthorized
+  5. If valid: validate Host and Origin against the allow-lists
+     - Host not allowed: return 421 ("Invalid Host header")
+     - Origin present and not allowed: return 403 ("Invalid Origin header")
+  6. If valid: establish SSE connection
 
 
 BEST PRACTICES - DO
 -------------------
   - Use strong, unique passwords (16+ characters)
   - Use different passwords for each PC
+  - List every remote PC explicitly in server.allowed_hosts
   - Limit file access to game directories only
   - Use VPN when accessing over internet
   - Enable TLS/HTTPS for production
@@ -60,6 +91,7 @@ BEST PRACTICES - DON'T
   - Run server as root/admin unless required
   - Share passwords across multiple systems
   - Ignore authentication failures in logs
+  - Widen server.allowed_hosts / server.allowed_origins to a wildcard
 
 
 NETWORK SECURITY
@@ -74,6 +106,7 @@ VPN Access (Recommended for remote):
   - Use WireGuard, OpenVPN, or Tailscale
   - Gaming PCs only accessible via VPN
   - Full encryption of traffic
+  - Add the VPN address of each PC to server.allowed_hosts
 
 Direct Internet (Not Recommended):
   - Requires TLS/HTTPS

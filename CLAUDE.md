@@ -163,7 +163,9 @@ Server configuration lives at `~/.gaming-agent/config.json`:
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "your-secure-password"
+    "password": "your-secure-password",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   },
   "vlm": {
     "enabled": false,
@@ -195,6 +197,8 @@ Configuration is stored at `~/.gaming-agent/config.json`. Environment overrides 
 | `server.host` | `0.0.0.0` | Bind address. |
 | `server.port` | `8765` | HTTP port. |
 | `server.password` | empty string | Empty password causes HTTP authentication requests to be rejected with 403. |
+| `server.allowed_hosts` | `["localhost:*", "127.0.0.1:*", "[::1]:*"]` | Host headers accepted by the MCP endpoints; loopback only by default. A remote PC must list its own host (e.g. `192.168.1.100:8765`) or every `/mcp` request is refused with 421. Override with `GAMING_AGENT_SERVER__ALLOWED_HOSTS` (JSON array value). |
+| `server.allowed_origins` | `["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]` | Origin headers accepted by the MCP endpoints; loopback only by default. A disallowed Origin is refused with 403. Override with `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array value). |
 | `vlm.enabled` | `false` | VLM is optional. |
 | `vlm.provider` | `ollama` | Supported provider when enabled. |
 | `vlm.model` | `qwen2.5-vl:3b` | Model name. |
