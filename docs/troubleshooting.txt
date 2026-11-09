@@ -110,14 +110,24 @@ Slow VLM Analysis
   - Consider upgrading GPU
 
 
-LOG FILE LOCATIONS
-------------------
-  Server log:  ~/.gaming-agent/logs/server.log
-  Action log:  ~/.gaming-agent/logs/actions.log
-  Error log:   ~/.gaming-agent/logs/errors.log
+WHERE SERVER OUTPUT GOES
+-----------------------
+The server writes no log or audit files of its own: there is no
+~/.gaming-agent/logs directory and no audit trail. It emits Python logging
+records on stdout/stderr instead:
 
-Enable debug logging:
-  Set GAMING_AGENT_DEBUG=1 environment variable
+  - A failed authentication attempt is logged as a warning on stderr
+  - Uvicorn's access and error output goes to the same stdout/stderr streams
+  - Tool executions are not logged, so there is no record of the commands
+    run or the files read
+
+Capture the output if you want a record:
+
+  gaming-agent serve 2>&1 | tee -a server.log
+
+There is no debug switch to turn on: GAMING_AGENT_DEBUG is not read by the
+code and the server has no verbose flag. Uvicorn's log level is fixed at
+"info".
 
 
 PLATFORM-SPECIFIC ISSUES
@@ -155,7 +165,7 @@ GETTING HELP
 ------------
 If issues persist:
 
-  1. Check log files for specific errors
+  1. Check the captured server output for specific errors
   2. Verify all configuration settings
   3. Test each component independently
   4. Document exact error messages

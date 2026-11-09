@@ -19,7 +19,7 @@ Master Claude (Orchestrator)
 - **Multi-Monitor Support**: Target specific monitors for screenshots and actions
 - **Dual Transport Modes**: HTTP/SSE for remote control, stdio for local clients
 - **Optional Local VLM**: Use Ollama (Qwen2.5-VL, Moondream) for fast local screen analysis
-- **Security-First**: Bearer token auth, path restrictions, command blocklist, audit logging
+- **Security-First**: Bearer token auth, Host/Origin allow-lists, path restrictions, command blocklist
 - **Cross-Platform**: Windows, Linux, macOS with auto-detection
 
 ## Quick Start
@@ -430,14 +430,20 @@ To use the `analyze_screen` tool with local vision models:
   `server.allowed_hosts` (e.g. `192.168.1.100:8765`); without it every `/mcp`
   request is refused with `421`
 - Widen the allow-lists with `GAMING_AGENT_SERVER__ALLOWED_HOSTS` /
-  `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array values); these apply only
-  when no config file exists - once `~/.gaming-agent/config.json` exists the
-  environment is ignored, so edit `server.allowed_hosts` there instead
+  `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array values); these fill in the
+  allow-lists only while `~/.gaming-agent/config.json` does not set them - once
+  the file carries `server.allowed_hosts` / `server.allowed_origins` those
+  entries are used as-is, so edit them there instead
 - Limit file access to game directories only in `allowed_paths`
 - Use a VPN if accessing over internet (never expose to public)
-- Enable TLS/HTTPS for production (use reverse proxy like nginx)
+- The server speaks plain HTTP - terminate TLS/HTTPS at a reverse proxy such
+  as nginx for production
+- The server has no built-in rate limiting, lockout or audit trail: put an
+  external rate limiter in front of it and keep it on a private network
 - Regularly rotate passwords (weekly for high-security environments)
-- Monitor `~/.gaming-agent/audit.log` for suspicious activity
+- The server writes no log or audit files - it logs to stdout/stderr, so
+  capture that output (`gaming-agent serve 2>&1 | tee -a server.log`) and
+  review it for failed authentication attempts
 - Set appropriate `max_command_timeout` to prevent runaway processes
 
 ## Development

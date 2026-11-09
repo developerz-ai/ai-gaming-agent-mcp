@@ -260,9 +260,11 @@ After install, config lives at `~/.gaming-agent/config.json`:
 1. **Password/Token** — Required for all connections
 2. **Path Restrictions** — Limit file access to specific directories
 3. **Command Blocklist** — Prevent dangerous shell commands
-4. **Rate Limiting** — Max requests per minute
-5. **Audit Logging** — Log all actions with timestamps
-6. **TLS/HTTPS** — Encrypt all traffic (optional but recommended)
+4. **Rate Limiting** — NOT IMPLEMENTED (planned only): no max requests per minute
+5. **Audit Logging** — NOT IMPLEMENTED (planned only): the server writes no
+   audit trail and no log files
+6. **TLS/HTTPS** — Deployment concern: the server speaks plain HTTP, so TLS
+   is terminated by a reverse proxy (nginx, Caddy)
 
 ---
 
