@@ -57,9 +57,10 @@ server.allowed_origins. Both default to loopback only.
   - Environment overrides (JSON array values):
       GAMING_AGENT_SERVER__ALLOWED_HOSTS
       GAMING_AGENT_SERVER__ALLOWED_ORIGINS
-    These apply only when no config file exists; once config.json exists,
-    its server.allowed_hosts / server.allowed_origins are used as-is and
-    the environment is ignored.
+    These fill in the allow-lists only while config.json does not set them.
+    Once config.json carries server.allowed_hosts / server.allowed_origins
+    (a config.json written by "gaming-agent init" carries both), those
+    entries are used as-is and the environment is ignored for them.
 
 
 CLAUDE DESKTOP CONFIGURATION
@@ -126,15 +127,43 @@ Gemma 3 4B       | 8GB   | Moderate | Better  | Multilingual
 
 ENVIRONMENT VARIABLES
 ---------------------
-These override config file settings:
+The environment supplies every setting that config.json does not define.
+A value written in config.json wins over the environment for that setting.
+A config.json written by "gaming-agent init" carries every field, so once
+that file exists the variables below have no effect.
 
-  GAMING_AGENT_PORT     - Server port
-  GAMING_AGENT_PASSWORD - Authentication password
-  GAMING_AGENT_VLM      - Enable VLM (1 or 0)
-  GAMING_AGENT_DEBUG    - Enable debug logging
+Each setting is nested, so a variable is the GAMING_AGENT_ prefix followed by
+the section and the field, separated by a double underscore. Boolean
+settings take true/false; list settings take a JSON array.
 
-These apply only when no config.json exists (once it exists, its values are
-used as-is and these are ignored - see HOST AND ORIGIN VALIDATION above):
+  Server:
+    GAMING_AGENT_SERVER__HOST       - Server bind address
+    GAMING_AGENT_SERVER__PORT       - Server port
+    GAMING_AGENT_SERVER__PASSWORD   - Authentication password
+    GAMING_AGENT_SERVER__ALLOWED_HOSTS - Allowed Host headers
+    GAMING_AGENT_SERVER__ALLOWED_ORIGINS - Allowed Origin headers
 
-  GAMING_AGENT_SERVER__ALLOWED_HOSTS   - Allowed Host headers (JSON array)
-  GAMING_AGENT_SERVER__ALLOWED_ORIGINS - Allowed Origin headers (JSON array)
+  VLM:
+    GAMING_AGENT_VLM__ENABLED  - Enable VLM
+    GAMING_AGENT_VLM__PROVIDER - VLM provider (ollama)
+    GAMING_AGENT_VLM__MODEL    - VLM model name
+    GAMING_AGENT_VLM__ENDPOINT - VLM endpoint URL
+
+  Security:
+    GAMING_AGENT_SECURITY__ALLOWED_PATHS - Accessible paths
+    GAMING_AGENT_SECURITY__BLOCKED_COMMANDS - Prohibited commands
+    GAMING_AGENT_SECURITY__MAX_COMMAND_TIMEOUT - Command timeout (seconds)
+
+  Features:
+    GAMING_AGENT_FEATURES__SCREENSHOT - Allow screenshot capture
+    GAMING_AGENT_FEATURES__FILE_ACCESS - Allow file read/write
+    GAMING_AGENT_FEATURES__COMMAND_EXECUTION - Allow shell commands
+    GAMING_AGENT_FEATURES__MOUSE_CONTROL - Allow mouse automation
+    GAMING_AGENT_FEATURES__KEYBOARD_CONTROL - Allow keyboard automation
+
+There is no debug switch and no logging configuration: the server reads no
+GAMING_AGENT_DEBUG variable, and its log records go to the process output
+(stdout/stderr) rather than to a log file.
+
+The environment is also read when "gaming-agent init" writes the config
+file, so a variable set before that first run is stored in config.json.

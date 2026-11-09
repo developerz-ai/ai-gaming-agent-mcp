@@ -204,10 +204,12 @@ Note: Use double underscore `__` for nested keys. `allowed_hosts` and
 `allowed_origins` take a JSON array as their value - a bare comma-separated
 string is rejected.
 
-Note: when `~/.gaming-agent/config.json` exists, its values are loaded as-is.
-A config file's `server.allowed_hosts` / `server.allowed_origins` win and are
-not merged with the environment; the environment overrides apply when there is
-no config file.
+Note: a value written in `~/.gaming-agent/config.json` wins over the
+environment for that setting, and the environment supplies every setting the
+config file does not define. A config file's `server.allowed_hosts` /
+`server.allowed_origins` win and are not merged with the environment; the
+environment overrides fill in the allow-lists only while the config file does
+not set them.
 
 ## CLI Override
 

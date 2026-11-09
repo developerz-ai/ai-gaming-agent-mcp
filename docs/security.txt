@@ -10,6 +10,7 @@ The system implements multiple security measures:
      - Validated on every request
      - Checked first: an invalid token is refused with 401 before any
        Host or Origin check runs
+     - An empty configured password refuses every request with 403
 
   2. DNS-Rebinding Protection (transport layer)
      - The Host and Origin headers of every /mcp request are validated
@@ -39,22 +40,37 @@ The system implements multiple security measures:
   3. Path Restrictions
      - File access limited to allowed directories
      - Prevents access to system files
+     - An empty security.allowed_paths means no restriction at all: set it
+       to the game directories to restrict access
 
   4. Command Blocklist
      - Dangerous commands are blocked
      - Prevents system damage
 
-  5. Rate Limiting
-     - Maximum requests per minute
-     - Prevents abuse
-
-  6. Audit Logging
-     - All actions logged with timestamps
-     - Enables review and forensics
-
-  7. TLS/HTTPS (Optional)
-     - Encrypts all traffic
+  5. TLS/HTTPS (terminated by a reverse proxy)
+     - The server itself speaks plain HTTP and does not terminate TLS
+     - Encryption is the reverse proxy's job (nginx, Caddy, ...)
      - Recommended for production
+
+
+NOT IMPLEMENTED
+---------------
+The following are NOT protections in this release:
+
+  - Rate Limiting - NOT IMPLEMENTED (planned only)
+    - Rate limiting is not currently implemented: there is no per-minute
+      request cap, no per-IP throttle and no lockout, so failed
+      authentications are unlimited
+    - The bearer token is therefore NOT brute-force mitigation
+    - Because it is not implemented, rate limiting has to come from an
+      external limiter (reverse proxy or firewall) or from keeping the
+      server on a private network
+
+  - Audit Trail - NOT IMPLEMENTED (planned only)
+    - The server writes no audit trail and no ~/.gaming-agent/logs/*.log
+      files
+    - It emits Python logging records on stdout/stderr instead (see
+      LOGGING AND MONITORING)
 
 
 AUTHENTICATION FLOW
@@ -76,9 +92,12 @@ BEST PRACTICES - DO
   - List every remote PC explicitly in server.allowed_hosts
   - Limit file access to game directories only
   - Use VPN when accessing over internet
-  - Enable TLS/HTTPS for production
+  - Terminate TLS/HTTPS at a reverse proxy for production
+  - Put an external rate limiter (reverse proxy, firewall) in front of the
+    server - the server has none of its own
   - Rotate passwords regularly
-  - Review audit logs periodically
+  - Capture the server's stdout/stderr output and review it periodically
+    (there is no audit log)
   - Keep software updated
 
 
@@ -90,7 +109,7 @@ BEST PRACTICES - DON'T
   - Give access to system directories
   - Run server as root/admin unless required
   - Share passwords across multiple systems
-  - Ignore authentication failures in logs
+  - Ignore authentication failures in the server output
   - Widen server.allowed_hosts / server.allowed_origins to a wildcard
 
 
@@ -111,6 +130,8 @@ VPN Access (Recommended for remote):
 Direct Internet (Not Recommended):
   - Requires TLS/HTTPS
   - Strong password essential
+  - No built-in rate limiting: put an external limiter or IP allowlist in
+    front of the server
   - Consider IP allowlisting
   - Monitor for attacks
 
@@ -144,17 +165,30 @@ Never allow:
 
 LOGGING AND MONITORING
 ----------------------
-Log files are stored in ~/.gaming-agent/logs/
+The server writes no log or audit files of its own. It emits Python logging
+records on stdout/stderr:
 
-  server.log  - Server events and connections
-  actions.log - All tool executions
-  errors.log  - Error events
+  - A wrong token and a missing configured password are logged as warnings
+  - Nothing in the package configures a logging handler, and the root logger
+    stays at WARNING, so the info-level records the server writes (server
+    start/stop, each new SSE connection) are dropped before any handler sees
+    them: no start/stop or connection record reaches the output
+  - Warning-and-above records do reach stderr: the failed authentications
+    above, plus the workflow engine's warnings and exceptions (a screenshot
+    that failed, a terminal that would not close)
+  - Uvicorn's access and error output is mixed into the same stdout/stderr
+    streams
 
-Review logs regularly for:
+Tool executions are not logged: the output shows no record of the commands
+run or the files read. Use host-level auditing if you need that trail.
+
+Capture the output if you want a record:
+
+  gaming-agent serve 2>&1 | tee -a server.log
+
+Review the captured output regularly for:
   - Failed authentication attempts
-  - Unusual command patterns
-  - Unexpected file access
-  - High request rates
+  - Unexpected connections
 
 
 INCIDENT RESPONSE
@@ -163,7 +197,7 @@ If you suspect unauthorized access:
 
   1. Stop the MCP server immediately
   2. Change passwords
-  3. Review audit logs
+  3. Review the captured server output for failed authentication attempts
   4. Check for unauthorized file changes
   5. Restart with new configuration
   6. Consider additional security measures
