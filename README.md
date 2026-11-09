@@ -430,8 +430,9 @@ To use the `analyze_screen` tool with local vision models:
   `server.allowed_hosts` (e.g. `192.168.1.100:8765`); without it every `/mcp`
   request is refused with `421`
 - Widen the allow-lists with `GAMING_AGENT_SERVER__ALLOWED_HOSTS` /
-  `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array values); a config file's
-  values win over the environment
+  `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array values); these apply only
+  when no config file exists - once `~/.gaming-agent/config.json` exists the
+  environment is ignored, so edit `server.allowed_hosts` there instead
 - Limit file access to game directories only in `allowed_paths`
 - Use a VPN if accessing over internet (never expose to public)
 - Enable TLS/HTTPS for production (use reverse proxy like nginx)

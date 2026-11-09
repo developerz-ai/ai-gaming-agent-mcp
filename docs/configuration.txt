@@ -57,7 +57,9 @@ server.allowed_origins. Both default to loopback only.
   - Environment overrides (JSON array values):
       GAMING_AGENT_SERVER__ALLOWED_HOSTS
       GAMING_AGENT_SERVER__ALLOWED_ORIGINS
-    A config file's values win over them.
+    These apply only when no config file exists; once config.json exists,
+    its server.allowed_hosts / server.allowed_origins are used as-is and
+    the environment is ignored.
 
 
 CLAUDE DESKTOP CONFIGURATION
@@ -130,5 +132,9 @@ These override config file settings:
   GAMING_AGENT_PASSWORD - Authentication password
   GAMING_AGENT_VLM      - Enable VLM (1 or 0)
   GAMING_AGENT_DEBUG    - Enable debug logging
+
+These apply only when no config.json exists (once it exists, its values are
+used as-is and these are ignored - see HOST AND ORIGIN VALIDATION above):
+
   GAMING_AGENT_SERVER__ALLOWED_HOSTS   - Allowed Host headers (JSON array)
   GAMING_AGENT_SERVER__ALLOWED_ORIGINS - Allowed Origin headers (JSON array)
