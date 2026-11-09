@@ -72,6 +72,11 @@ Add to your Claude Desktop config (`~/.config/claude/claude_desktop_config.json`
 }
 ```
 
+The MCP endpoints validate the `Host` and `Origin` headers against
+`server.allowed_hosts` / `server.allowed_origins`, which default to loopback
+only. A remote PC must list its own address (e.g. `192.168.1.100:8765`) in
+`server.allowed_hosts`, otherwise the request is refused with `421`.
+
 **For Stdio Transport:**
 
 ```json
@@ -295,7 +300,9 @@ Create `~/.gaming-agent/config.json`:
   "server": {
     "host": "0.0.0.0",
     "port": 8765,
-    "password": "your-secure-password"
+    "password": "your-secure-password",
+    "allowed_hosts": ["localhost:*", "127.0.0.1:*", "[::1]:*"],
+    "allowed_origins": ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
   },
   "vlm": {
     "enabled": false,
@@ -415,6 +422,16 @@ To use the `analyze_screen` tool with local vision models:
 ## Security
 
 - Always use strong, unique passwords (min 16 chars, random)
+- The MCP endpoints (`/mcp`, `/mcp/messages`) validate the `Host` and `Origin`
+  headers against `server.allowed_hosts` / `server.allowed_origins`, which
+  default to loopback only. A `Host` outside the allow-list is refused with
+  `421`, a disallowed `Origin` with `403`
+- A remote Claude Desktop connection needs the PC's own host in
+  `server.allowed_hosts` (e.g. `192.168.1.100:8765`); without it every `/mcp`
+  request is refused with `421`
+- Widen the allow-lists with `GAMING_AGENT_SERVER__ALLOWED_HOSTS` /
+  `GAMING_AGENT_SERVER__ALLOWED_ORIGINS` (JSON array values); a config file's
+  values win over the environment
 - Limit file access to game directories only in `allowed_paths`
 - Use a VPN if accessing over internet (never expose to public)
 - Enable TLS/HTTPS for production (use reverse proxy like nginx)

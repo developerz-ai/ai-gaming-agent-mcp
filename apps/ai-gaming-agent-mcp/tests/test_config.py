@@ -1,5 +1,6 @@
 """Tests for configuration module."""
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -24,6 +25,72 @@ def test_server_config():
     assert server.host == "127.0.0.1"
     assert server.port == 9000
     assert server.password == "secret"
+
+
+def test_server_transport_allow_list_defaults():
+    """Test that the transport allow-list defaults to loopback only."""
+    server = ServerConfig()
+
+    assert server.allowed_hosts == ["localhost:*", "127.0.0.1:*", "[::1]:*"]
+    assert server.allowed_origins == ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
+
+    # No default entry may name every host or every origin.
+    assert [entry.removesuffix(":*") for entry in server.allowed_hosts] == ["localhost", "127.0.0.1", "[::1]"]
+    assert [entry.removesuffix(":*") for entry in server.allowed_origins] == [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://[::1]",
+    ]
+
+
+def test_allowed_hosts_and_origins_env_overrides(monkeypatch):
+    """Test that the allow-list can be widened through the environment."""
+    monkeypatch.setenv(
+        "GAMING_AGENT_SERVER__ALLOWED_HOSTS",
+        '["localhost:*", "192.168.1.100:8765"]',
+    )
+    monkeypatch.setenv(
+        "GAMING_AGENT_SERVER__ALLOWED_ORIGINS",
+        '["http://localhost:*", "http://192.168.1.100:8765"]',
+    )
+
+    config = Config()
+
+    assert config.server.allowed_hosts == ["localhost:*", "192.168.1.100:8765"]
+    assert config.server.allowed_origins == ["http://localhost:*", "http://192.168.1.100:8765"]
+
+
+def test_allow_list_is_saved_to_config_file(monkeypatch):
+    """Test that the allow-list lands in the saved configuration file."""
+    monkeypatch.delenv("GAMING_AGENT_SERVER__ALLOWED_HOSTS", raising=False)
+    monkeypatch.delenv("GAMING_AGENT_SERVER__ALLOWED_ORIGINS", raising=False)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+        Config().save(config_path)
+        data = json.loads(config_path.read_text())
+
+    assert data["server"]["allowed_hosts"] == ["localhost:*", "127.0.0.1:*", "[::1]:*"]
+    assert data["server"]["allowed_origins"] == ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
+
+
+def test_config_file_allow_list_wins_over_environment(monkeypatch):
+    """Test that a saved config file's allow-list wins over the environment."""
+    monkeypatch.setenv("GAMING_AGENT_SERVER__ALLOWED_HOSTS", '["env-host:*"]')
+    monkeypatch.setenv("GAMING_AGENT_SERVER__ALLOWED_ORIGINS", '["http://env-host:*"]')
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+
+        config = Config()
+        config.server.allowed_hosts = ["file-host:*"]
+        config.server.allowed_origins = ["http://file-host:*"]
+        config.save(config_path)
+
+        loaded = Config.load(config_path)
+
+    assert loaded.server.allowed_hosts == ["file-host:*"]
+    assert loaded.server.allowed_origins == ["http://file-host:*"]
 
 
 def test_security_config_defaults():

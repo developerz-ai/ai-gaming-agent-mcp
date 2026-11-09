@@ -13,6 +13,10 @@ SERVER SETTINGS
   host     - Bind address (default: 0.0.0.0 for all interfaces)
   port     - Server port (default: 8765)
   password - Authentication password (required)
+  allowed_hosts   - Host headers accepted by /mcp
+                    (default: localhost:*, 127.0.0.1:*, [::1]:*)
+  allowed_origins - Origin headers accepted by /mcp
+                    (default: http://localhost:*, http://127.0.0.1:*, http://[::1]:*)
 
 VLM SETTINGS (Optional)
   enabled  - Enable local vision model (true/false)
@@ -31,6 +35,29 @@ FEATURE TOGGLES
   command_execution  - Allow shell commands
   mouse_control      - Allow mouse automation
   keyboard_control   - Allow keyboard automation
+
+
+HOST AND ORIGIN VALIDATION
+---------------------------
+The MCP endpoints (/mcp and /mcp/messages) validate the Host and Origin
+headers of every request against server.allowed_hosts and
+server.allowed_origins. Both default to loopback only.
+
+  - Host not allowed: refused with 421 ("Invalid Host header")
+  - Origin present and not allowed: refused with 403 ("Invalid Origin header")
+  - The bearer token is checked first: an invalid token still returns 401
+  - An entry matches exactly, or any host:port form of that host when it
+    ends in ":*"
+  - The wildcard covers host:port forms only: "192.168.1.100:*" matches
+    "192.168.1.100:8765" but not the bare "192.168.1.100", which needs its
+    own exact entry (otherwise it is refused with 421/403)
+  - A remote PC must list its own address (e.g. 192.168.1.100:8765) in
+    server.allowed_hosts, or every /mcp request from that client is refused
+    with 421
+  - Environment overrides (JSON array values):
+      GAMING_AGENT_SERVER__ALLOWED_HOSTS
+      GAMING_AGENT_SERVER__ALLOWED_ORIGINS
+    A config file's values win over them.
 
 
 CLAUDE DESKTOP CONFIGURATION
@@ -52,6 +79,9 @@ For each gaming PC, add an entry under "mcpServers":
   Transport: sse
   URL: http://<PC-IP>:8765/mcp
   Headers: Authorization header with "Bearer <password>"
+
+Each PC must list its own address in its own server.allowed_hosts, otherwise
+the remote connection is refused with 421 (see HOST AND ORIGIN VALIDATION).
 
 
 NETWORK CONFIGURATION
@@ -100,3 +130,5 @@ These override config file settings:
   GAMING_AGENT_PASSWORD - Authentication password
   GAMING_AGENT_VLM      - Enable VLM (1 or 0)
   GAMING_AGENT_DEBUG    - Enable debug logging
+  GAMING_AGENT_SERVER__ALLOWED_HOSTS   - Allowed Host headers (JSON array)
+  GAMING_AGENT_SERVER__ALLOWED_ORIGINS - Allowed Origin headers (JSON array)

@@ -8,6 +8,12 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_ALLOWED_HOSTS = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
+"""Host header values the HTTP transport accepts by default (loopback only)."""
+
+DEFAULT_ALLOWED_ORIGINS = ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
+"""Origin header values the HTTP transport accepts by default (loopback only)."""
+
 
 class ServerConfig(BaseModel):
     """Server configuration."""
@@ -15,6 +21,8 @@ class ServerConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8765
     password: str = ""
+    allowed_hosts: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_HOSTS))
+    allowed_origins: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_ORIGINS))
 
 
 class VLMConfig(BaseModel):
