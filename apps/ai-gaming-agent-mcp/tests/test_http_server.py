@@ -5,17 +5,38 @@ Tests mock the create_server function to avoid GUI dependencies.
 """
 
 import sys
-from unittest.mock import MagicMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser, authorization_context
+from starlette.responses import Response
 
 from ai_gaming_agent.config import Config
+
+
+class _RecordingSseTransport:
+    """Stand-in for SseServerTransport that records the scopes it is handed."""
+
+    def __init__(self) -> None:
+        self.connected_scopes: list[dict] = []
+        self.posted_scopes: list[dict] = []
+
+    @asynccontextmanager
+    async def connect_sse(self, scope: dict, receive, send):
+        self.connected_scopes.append(scope)
+        yield (MagicMock(), MagicMock())
+
+    async def handle_post_message(self, scope: dict, receive, send) -> None:
+        self.posted_scopes.append(scope)
+        await Response("Accepted", status_code=202)(scope, receive, send)
 
 
 def _get_mock_create_server():
     """Create a mock for create_server that returns a mock MCP server."""
     mock_server = MagicMock()
     mock_server.create_initialization_options.return_value = {}
+    mock_server.run = AsyncMock(return_value=None)
     return MagicMock(return_value=mock_server)
 
 
@@ -346,3 +367,105 @@ class TestAuthenticationEdgeCases:
                 headers={"Authorization": "test-password"},
             )
             assert response.status_code == 401
+
+
+class TestSessionPrincipal:
+    """Tests that each authenticated request names a principal in the ASGI scope.
+
+    The mcp SSE transport binds a session to the credential that opened it and
+    rejects a posted message whose principal differs. It records an owner only
+    when ``scope["user"]`` is an `AuthenticatedUser`, so an unset scope makes
+    that ownership check pass for anyone holding the password (the class of bug
+    fixed upstream in mcp 1.27.2). These tests pin both sides of the check.
+    """
+
+    @staticmethod
+    def _recording_app(config: Config):
+        """Build a client whose transport records every scope it receives."""
+        recording = _RecordingSseTransport()
+        client = TestClient(create_test_app(config))
+        client.__enter__()
+        # The lifespan builds the real transport; hand it the recorder instead.
+        from ai_gaming_agent import http_server
+
+        http_server._sse_transport = recording
+        return client, recording
+
+    def test_sse_endpoint_sets_authenticated_principal(self):
+        """GET /mcp with a valid token records an AuthenticatedUser in the scope."""
+        config = Config()
+        config.server.password = "test-password"
+        client, recording = self._recording_app(config)
+
+        try:
+            response = client.get("/mcp", headers={"Authorization": "Bearer test-password"})
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 200
+        assert len(recording.connected_scopes) == 1
+        user = recording.connected_scopes[0].get("user")
+        assert isinstance(user, AuthenticatedUser)
+        assert authorization_context(user)["client_id"] == user.access_token.client_id
+        # The credential itself is never carried in the scope.
+        assert user.access_token.token != "test-password"
+
+    def test_post_endpoint_sets_authenticated_principal(self):
+        """POST /mcp/messages derives a principal for the request too."""
+        config = Config()
+        config.server.password = "test-password"
+        client, recording = self._recording_app(config)
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={"Authorization": "Bearer test-password"},
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 202
+        assert len(recording.posted_scopes) == 1
+        post_user = recording.posted_scopes[0].get("user")
+        assert isinstance(post_user, AuthenticatedUser)
+        assert post_user.access_token.token != "test-password"
+
+    def test_sse_and_post_agree_on_principal(self):
+        """The session owner recorded on GET matches the requestor on POST.
+
+        This is the comparison the transport makes; deriving different
+        principals on the two sides would reject every legitimate message.
+        """
+        config = Config()
+        config.server.password = "shared-secret"
+        client, recording = self._recording_app(config)
+
+        try:
+            client.get("/mcp", headers={"Authorization": "Bearer shared-secret"})
+            client.post("/mcp/messages", json={}, headers={"Authorization": "Bearer shared-secret"})
+        finally:
+            client.__exit__(None, None, None)
+
+        owner = recording.connected_scopes[0]["user"]
+        requestor = recording.posted_scopes[0]["user"]
+        assert authorization_context(owner) == authorization_context(requestor)
+
+    def test_unauthenticated_request_never_reaches_transport(self):
+        """A rejected request is stopped before the transport sees it."""
+        config = Config()
+        config.server.password = "test-password"
+        client, recording = self._recording_app(config)
+
+        try:
+            response = client.post(
+                "/mcp/messages",
+                json={},
+                headers={"Authorization": "Bearer wrong-password"},
+            )
+        finally:
+            client.__exit__(None, None, None)
+
+        assert response.status_code == 401
+        assert recording.posted_scopes == []
+        assert recording.connected_scopes == []

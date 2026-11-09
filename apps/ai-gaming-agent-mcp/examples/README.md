@@ -168,7 +168,7 @@ uv run terminal_demo.py --password mypassword
 
 ### Python Dependencies
 
-- `mcp>=1.0.0` - MCP protocol implementation
+- `mcp>=1.30.0,<2` - MCP protocol implementation
 - `httpx` - Async HTTP client (optional, for this demo)
 
 ### Optional
