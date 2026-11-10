@@ -1,376 +1,272 @@
-"""Tests for tool modules."""
+"""Headless tests for tool modules and feature-switch boundaries."""
 
+import base64
+import builtins
+import importlib
 import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-# Skip GUI tests if pyautogui not importable (CI without display/tkinter)
-try:
-    import pyautogui  # noqa: F401
-
-    HAS_GUI = True
-except (ImportError, SystemExit, Exception):
-    HAS_GUI = False
+from ai_gaming_agent.config import Config
 
 
-def test_write_and_read_file():
-    """Test writing and reading files."""
+@pytest.fixture(autouse=True)
+def tool_config():
+    """Isolate every tool call from user configuration and environment overrides."""
+    config = Config.model_construct()
+    with patch.object(Config, "load", return_value=config):
+        yield config
+
+
+@pytest.fixture
+def backends(monkeypatch):
+    gui, clipboard, monitors = MagicMock(), MagicMock(), MagicMock()
+    gui.position.return_value = SimpleNamespace(x=10, y=20)
+    image = gui.screenshot.return_value
+    image.width, image.height = 640, 480
+    image.save.side_effect = lambda buffer, format: buffer.write(b"png")
+    clipboard.paste.return_value = "original"
+    monitors.get_monitors.return_value = [SimpleNamespace(x=0, y=0, width=640, height=480, is_primary=True)]
+    for name, backend in {"pyautogui": gui, "pyperclip": clipboard, "screeninfo": monitors}.items():
+        monkeypatch.setitem(sys.modules, name, backend)
+    return gui, clipboard, monitors
+
+
+def test_write_and_read_file(tmp_path):
     from ai_gaming_agent.tools.files import read_file, write_file
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = str(Path(tmpdir) / "test.txt")
-
-        # Write file
-        result = write_file(file_path, "Hello, World!")
-        assert result["success"] is True
-
-        # Read file
-        result = read_file(file_path)
-        assert result["success"] is True
-        assert result["content"] == "Hello, World!"
-        assert result["binary"] is False
+    path = str(tmp_path / "test.txt")
+    assert write_file(path, "Hello, World!")["success"] is True
+    result = read_file(path)
+    assert result == {"success": True, "content": "Hello, World!", "binary": False}
 
 
-def test_list_files():
-    """Test listing directory contents."""
+def test_list_files(tmp_path):
     from ai_gaming_agent.tools.files import list_files
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create some files
-        (Path(tmpdir) / "file1.txt").write_text("content1")
-        (Path(tmpdir) / "file2.txt").write_text("content2")
-        (Path(tmpdir) / "subdir").mkdir()
-
-        result = list_files(tmpdir)
-        assert result["success"] is True
-        assert len(result["items"]) == 3
-
-        names = {item["name"] for item in result["items"]}
-        assert "file1.txt" in names
-        assert "file2.txt" in names
-        assert "subdir" in names
+    (tmp_path / "file1.txt").write_text("content1")
+    (tmp_path / "file2.txt").write_text("content2")
+    (tmp_path / "subdir").mkdir()
+    result = list_files(str(tmp_path))
+    assert result["success"] is True
+    assert len(result["items"]) == 3
+    assert {item["name"] for item in result["items"]} == {"file1.txt", "file2.txt", "subdir"}
 
 
-def test_read_nonexistent_file():
-    """Test reading a file that doesn't exist."""
+def test_read_nonexistent_file(tmp_path):
     from ai_gaming_agent.tools.files import read_file
 
-    result = read_file("/nonexistent/file.txt")
+    result = read_file(str(tmp_path / "missing"))
     assert result["success"] is False
     assert "not found" in result["error"].lower()
 
 
-@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
-def test_keyboard_functions_return_dict():
-    """Test that keyboard functions return proper dicts."""
-    from ai_gaming_agent.tools.keyboard import hotkey, press_key, type_text
-
-    result = type_text("test")
-    assert isinstance(result, dict)
-    assert "success" in result
-    assert result.get("method") == "type"
-
-    result = press_key("enter")
-    assert isinstance(result, dict)
-    assert "success" in result
-
-    result = hotkey(["ctrl", "c"])
-    assert isinstance(result, dict)
-    assert "success" in result
-
-
-@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
-def test_type_text_with_paste():
-    """Test type_text with use_paste=True for fast clipboard-based input."""
-    from ai_gaming_agent.tools.keyboard import type_text
-
-    # Test paste method returns correct result structure
-    result = type_text("hello world", use_paste=True)
-    assert isinstance(result, dict)
-    assert "success" in result
-    if result["success"]:
-        assert result.get("method") == "paste"
-        assert result.get("text") == "hello world"
+GUI_CASES = [
+    ("screen", "screenshot", "screenshot", {}, call.screenshot()),
+    ("screen", "screenshot", "screenshot", {"monitor": 0}, call.screenshot(region=(0, 0, 640, 480))),
+    ("screen", "screenshot", "get_screen_size", {}, None),
+    ("screen", "screenshot", "get_screen_size", {"monitor": 0}, None),
+    ("mouse", "mouse_control", "click", {"x": 10, "y": 20}, call.click(x=10, y=20, button="left")),
+    ("mouse", "mouse_control", "double_click", {"x": 10, "y": 20}, call.doubleClick(x=10, y=20)),
+    ("mouse", "mouse_control", "move_to", {"x": 10, "y": 20}, call.moveTo(x=10, y=20, duration=0.0)),
+    ("mouse", "mouse_control", "drag_to", {"x": 10, "y": 20}, call.dragTo(x=10, y=20, duration=0.5)),
+    ("mouse", "mouse_control", "scroll", {"clicks": 3}, call.scroll(3, x=None, y=None)),
+    ("mouse", "mouse_control", "get_mouse_position", {}, call.position()),
+    ("keyboard", "keyboard_control", "type_text", {"text": "test"}, call.write("test", interval=0.0)),
+    ("keyboard", "keyboard_control", "type_text", {"text": "test", "use_paste": True}, call.hotkey("ctrl", "v")),
+    ("keyboard", "keyboard_control", "press_key", {"key": "enter"}, call.press("enter")),
+    ("keyboard", "keyboard_control", "press_key", {"key": "enter", "modifiers": ["ctrl"]}, call.press("enter")),
+    ("keyboard", "keyboard_control", "hotkey", {"keys": ["ctrl", "c"]}, call.hotkey("ctrl", "c")),
+]
 
 
-@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
-def test_type_text_method_field():
-    """Test that type_text returns 'method' field indicating input method used."""
-    from ai_gaming_agent.tools.keyboard import type_text
+@pytest.mark.parametrize("module,feature,name,args,backend_call", GUI_CASES)
+def test_gui_feature_switches(module, feature, name, args, backend_call, backends, tool_config):
+    gui, clipboard, monitors = backends
+    tool_module = importlib.reload(importlib.import_module(f"ai_gaming_agent.tools.{module}"))
+    handler = getattr(tool_module, name)
+    assert getattr(tool_config.features, feature) is True
+    with patch("platform.system", return_value="Linux"):
+        for enabled in (True, False, True):
+            setattr(tool_config.features, feature, enabled)
+            for backend in backends:
+                backend.reset_mock()
+            result = handler(**args)
+            assert result["success"] is enabled
+            if not enabled:
+                assert "disabled" in result["error"].lower()
+                for backend in backends:
+                    assert backend.mock_calls == []
+                continue
+            if backend_call is not None:
+                assert backend_call in gui.mock_calls
+            if module == "screen":
+                assert (result["width"], result["height"]) == (640, 480)
+                if name == "get_screen_size" or "monitor" in args:
+                    monitors.get_monitors.assert_called_once_with()
+                else:
+                    monitors.get_monitors.assert_not_called()
+                if name == "screenshot":
+                    assert result["image"] == base64.b64encode(b"png").decode()
+                    assert result["format"] == "png"
+            if module == "mouse":
+                assert gui.FAILSAFE is False
+            if name == "get_mouse_position":
+                assert result == {"success": True, "x": 10, "y": 20}
+            if name == "type_text":
+                assert result["text"] == "test"
+                assert result["method"] == ("paste" if args.get("use_paste") else "type")
+            if args.get("use_paste"):
+                assert clipboard.copy.call_args_list == [call("test"), call("original")]
+            else:
+                assert clipboard.mock_calls == []
+            if args.get("modifiers"):
+                gui.hold.assert_called_once_with(["ctrl"])
+                gui.hold.return_value.__enter__.assert_called_once_with()
+                gui.hold.return_value.__exit__.assert_called_once()
 
-    # Regular typing should report "type" method
-    result = type_text("test", use_paste=False)
-    if result["success"]:
-        assert result.get("method") == "type"
 
-    # Paste should report "paste" method
-    result = type_text("test", use_paste=True)
-    if result["success"]:
-        assert result.get("method") == "paste"
+@pytest.mark.parametrize("module,feature,name,args,backend_call", GUI_CASES)
+def test_disabled_gui_never_imports_backends(module, feature, name, args, backend_call, tool_config):
+    setattr(tool_config.features, feature, False)
+    original_import = builtins.__import__
+    attempts = []
+
+    def guarded_import(name, *args, **kwargs):
+        if name.split(".")[0] in {"pyautogui", "pyperclip", "screeninfo", "PIL"}:
+            attempts.append(name)
+            raise ImportError("Desktop dependency unavailable")
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=guarded_import):
+        tool_module = importlib.reload(importlib.import_module(f"ai_gaming_agent.tools.{module}"))
+        result = getattr(tool_module, name)(**args)
+    assert attempts == []
+    assert result["success"] is False
+    assert "disabled" in result["error"].lower()
 
 
-# ============================================================================
-# UNIT TESTS FOR PASTE FUNCTIONALITY (requires GUI - skip in CI)
-# ============================================================================
+@pytest.mark.parametrize("name", ["screenshot", "get_screen_size"])
+@pytest.mark.parametrize("monitor", [-1, 1])
+def test_monitor_validation(name, monitor, backends, tool_config):
+    screen = importlib.reload(importlib.import_module("ai_gaming_agent.tools.screen"))
+    result = getattr(screen, name)(monitor=monitor)
+    assert result == {"success": False, "error": f"Invalid monitor index: {monitor}"}
+    backends[0].screenshot.assert_not_called()
+    tool_config.features.screenshot = False
+    backends[2].reset_mock()
+    result = getattr(screen, name)(monitor=monitor)
+    assert "disabled" in result["error"].lower()
+    backends[2].get_monitors.assert_not_called()
 
 
-@pytest.mark.skipif(not HAS_GUI, reason="GUI not available (pyautogui import fails in CI)")
+@pytest.mark.parametrize("name", ["read_file", "write_file", "list_files", "upload_file", "download_file"])
+@pytest.mark.parametrize("binary", [False, True])
+def test_file_feature_switches(name, binary, tmp_path, tool_config):
+    from ai_gaming_agent.tools import files
+
+    source = tmp_path / "source"
+    data = b"\xff\x00" if binary else b"test"
+    source.write_bytes(data)
+    target = tmp_path / "new" / "target"
+    writing = name in {"write_file", "upload_file"}
+    path = target if writing else tmp_path if name == "list_files" else source
+    args = {"path": str(path)}
+    if writing:
+        args.update(content=base64.b64encode(data).decode() if binary else "test", binary=binary)
+    assert tool_config.features.file_access is True
+    for enabled in (True, False, True):
+        tool_config.features.file_access = enabled
+        if target.exists():
+            target.unlink()
+            target.parent.rmdir()
+        with (
+            patch.object(files, "Path", wraps=files.Path) as path_factory,
+            patch.object(files, "_is_path_allowed", wraps=files._is_path_allowed) as allowed,
+        ):
+            result = getattr(files, name)(**args)
+        assert result["success"] is enabled
+        if not enabled:
+            assert "disabled" in result["error"].lower()
+            path_factory.assert_not_called()
+            allowed.assert_not_called()
+            assert not target.parent.exists()
+            assert source.read_bytes() == data
+        else:
+            path_factory.assert_called_once_with(str(path))
+            allowed.assert_called_once()
+            if writing:
+                assert target.read_bytes() == data
+            elif name == "list_files":
+                assert result["items"] == [{"name": "source", "is_dir": False, "size": len(data)}]
+            elif name == "download_file":
+                assert base64.b64decode(result["content"]) == data
+                assert result["filename"] == "source"
+                assert result["size"] == len(data)
+            else:
+                assert result["binary"] is binary
+                assert result["content"] == (base64.b64encode(data).decode() if binary else "test")
+
+
+@pytest.mark.parametrize("name", ["read_file", "write_file", "list_files", "upload_file", "download_file"])
+def test_file_allowed_paths_still_enforced(name, tmp_path, tool_config):
+    from ai_gaming_agent.tools import files
+
+    tool_config.security.allowed_paths = [str(tmp_path / "allowed")]
+    args = {"path": str(tmp_path / "outside")}
+    if name in {"write_file", "upload_file"}:
+        args["content"] = "test"
+    result = getattr(files, name)(**args)
+    assert result["success"] is False
+    assert "Path not allowed" in result["error"]
+    assert not (tmp_path / "outside").exists()
+
+
 class TestTypeTextPasteMocked:
-    """Unit tests for type_text paste functionality using mocks.
+    """Exercise paste behavior without a display or real clipboard."""
 
-    These tests mock pyperclip and pyautogui to test the paste logic
-    without requiring a real display or clipboard.
-    """
+    @pytest.mark.parametrize("system,key", [("Linux", "ctrl"), ("Windows", "ctrl"), ("Darwin", "command")])
+    @pytest.mark.parametrize("original", ["original content", ""])
+    def test_paste_and_restore(self, backends, system, key, original):
+        from ai_gaming_agent.tools.keyboard import type_text
 
-    def test_type_text_paste_copies_to_clipboard(self):
-        """Test that use_paste=True copies text to clipboard."""
-        # Create mock for pyperclip
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = "original"
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
+        gui, clipboard, _ = backends
+        clipboard.paste.return_value = original
+        with patch("platform.system", return_value=system):
             result = type_text("hello world", use_paste=True)
+        assert isinstance(result, dict)
+        assert result == {"success": True, "method": "paste", "text": "hello world"}
+        clipboard.copy.assert_any_call("hello world")
+        assert clipboard.copy.call_args_list == [call("hello world"), call(original)]
+        gui.hotkey.assert_called_once_with(key, "v")
 
-            assert result["success"] is True
-            assert result["method"] == "paste"
-            assert result["text"] == "hello world"
-            mock_pyperclip.copy.assert_any_call("hello world")
+    @pytest.mark.parametrize("failure", ["read", "restore", "copy", "hotkey"])
+    def test_paste_errors(self, backends, failure):
+        from ai_gaming_agent.tools.keyboard import type_text
 
-    def test_type_text_paste_uses_ctrl_v_on_linux(self):
-        """Test that paste uses Ctrl+V on Linux."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = ""
+        gui, clipboard, _ = backends
+        if failure == "read":
+            clipboard.paste.side_effect = Exception("Clipboard unavailable")
+        elif failure == "restore":
+            clipboard.copy.side_effect = [None, Exception("Restore failed")]
+        elif failure == "copy":
+            clipboard.copy.side_effect = Exception("Copy failed")
+        else:
+            gui.hotkey.side_effect = Exception("Hotkey failed")
+        result = type_text("test", use_paste=True)
+        assert result["success"] is (failure in {"read", "restore"})
+        if failure == "read":
+            clipboard.copy.assert_called_once_with("test")
+        if failure in {"copy", "hotkey"}:
+            assert f"{failure.capitalize()} failed" in result["error"]
 
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui,
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
+    @pytest.mark.parametrize("args,interval", [({}, 0.0), ({"use_paste": False}, 0.0), ({"interval": 0.1}, 0.1)])
+    def test_normal_typing(self, backends, args, interval):
+        from ai_gaming_agent.tools.keyboard import type_text
 
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            type_text("test", use_paste=True)
-
-            mock_pyautogui.hotkey.assert_called_with("ctrl", "v")
-
-    def test_type_text_paste_uses_ctrl_v_on_windows(self):
-        """Test that paste uses Ctrl+V on Windows."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = ""
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui,
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Windows"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            type_text("test", use_paste=True)
-
-            mock_pyautogui.hotkey.assert_called_with("ctrl", "v")
-
-    def test_type_text_paste_uses_cmd_v_on_macos(self):
-        """Test that paste uses Cmd+V on macOS."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = ""
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui,
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Darwin"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            type_text("test", use_paste=True)
-
-            mock_pyautogui.hotkey.assert_called_with("command", "v")
-
-    def test_type_text_paste_restores_original_clipboard(self):
-        """Test that paste restores original clipboard content."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = "original content"
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            type_text("new text", use_paste=True)
-
-            # Verify clipboard operations in order
-            copy_calls = mock_pyperclip.copy.call_args_list
-            assert len(copy_calls) == 2
-            assert copy_calls[0][0][0] == "new text"  # First copy: the text to paste
-            assert copy_calls[1][0][0] == "original content"  # Second copy: restore original
-
-    def test_type_text_paste_handles_empty_original_clipboard(self):
-        """Test that paste handles case when original clipboard is empty."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = ""
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=True)
-
-            assert result["success"] is True
-            # Empty string is not None, so it should try to restore
-            copy_calls = mock_pyperclip.copy.call_args_list
-            assert len(copy_calls) == 2
-
-    def test_type_text_paste_handles_clipboard_read_error(self):
-        """Test that paste handles errors when reading original clipboard."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.side_effect = Exception("Clipboard unavailable")
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=True)
-
-            assert result["success"] is True
-            # Should still work, just won't restore clipboard
-            mock_pyperclip.copy.assert_called_once_with("test")
-
-    def test_type_text_paste_handles_clipboard_restore_error(self):
-        """Test that paste handles errors when restoring clipboard."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = "original"
-        # First call to copy succeeds, second fails
-        mock_pyperclip.copy.side_effect = [None, Exception("Restore failed")]
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=True)
-
-            # Should still succeed even if restore fails
-            assert result["success"] is True
-
-    def test_type_text_paste_returns_error_on_copy_failure(self):
-        """Test that paste returns error if initial copy fails."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = "original"
-        mock_pyperclip.copy.side_effect = Exception("Copy failed")
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui"),
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=True)
-
-            assert result["success"] is False
-            assert "Copy failed" in result["error"]
-
-    def test_type_text_paste_returns_error_on_hotkey_failure(self):
-        """Test that paste returns error if hotkey paste fails."""
-        mock_pyperclip = MagicMock()
-        mock_pyperclip.paste.return_value = "original"
-
-        with (
-            patch.dict(sys.modules, {"pyperclip": mock_pyperclip}),
-            patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui,
-            patch("ai_gaming_agent.tools.keyboard.platform") as mock_platform,
-        ):
-            mock_platform.system.return_value = "Linux"
-            mock_pyautogui.hotkey.side_effect = Exception("Hotkey failed")
-
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=True)
-
-            assert result["success"] is False
-            assert "Hotkey failed" in result["error"]
-
-    def test_type_text_normal_uses_pyautogui_write(self):
-        """Test that use_paste=False uses pyautogui.write."""
-        with patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui:
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", use_paste=False)
-
-            assert result["success"] is True
-            assert result["method"] == "type"
-            mock_pyautogui.write.assert_called_once_with("test", interval=0.0)
-
-    def test_type_text_normal_with_interval(self):
-        """Test that interval parameter is passed to pyautogui.write."""
-        with patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui:
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test", interval=0.1, use_paste=False)
-
-            assert result["success"] is True
-            mock_pyautogui.write.assert_called_once_with("test", interval=0.1)
-
-    def test_type_text_default_is_normal_typing(self):
-        """Test that default behavior is normal typing, not paste."""
-        with patch("ai_gaming_agent.tools.keyboard.pyautogui") as mock_pyautogui:
-            from ai_gaming_agent.tools.keyboard import type_text
-
-            result = type_text("test")
-
-            assert result["success"] is True
-            assert result["method"] == "type"
-            mock_pyautogui.write.assert_called_once()
-
-
-@pytest.mark.skipif(not HAS_GUI, reason="GUI not available")
-def test_mouse_functions_return_dict():
-    """Test that mouse functions return proper dicts."""
-    from ai_gaming_agent.tools.mouse import click, get_mouse_position, scroll
-
-    result = click(100, 100)
-    assert isinstance(result, dict)
-    assert "success" in result
-
-    result = scroll(3)
-    assert isinstance(result, dict)
-    assert "success" in result
-
-    result = get_mouse_position()
-    assert isinstance(result, dict)
-    assert "success" in result
+        result = type_text("test", **args)
+        assert result == {"success": True, "method": "type", "text": "test"}
+        backends[0].write.assert_called_once_with("test", interval=interval)
+        assert backends[1].mock_calls == []

@@ -36,6 +36,9 @@ def read_file(path: str) -> dict[str, Any]:
         File contents (text or base64 for binary).
     """
     try:
+        if not get_config().features.file_access:
+            return {"success": False, "error": "File access is disabled"}
+
         file_path = Path(path)
         if not _is_path_allowed(file_path):
             return {"success": False, "error": f"Path not allowed: {path}"}
@@ -66,6 +69,9 @@ def write_file(path: str, content: str, binary: bool = False) -> dict[str, Any]:
         Success status.
     """
     try:
+        if not get_config().features.file_access:
+            return {"success": False, "error": "File access is disabled"}
+
         file_path = Path(path)
         if not _is_path_allowed(file_path):
             return {"success": False, "error": f"Path not allowed: {path}"}
@@ -92,6 +98,9 @@ def list_files(path: str) -> dict[str, Any]:
         List of files and directories.
     """
     try:
+        if not get_config().features.file_access:
+            return {"success": False, "error": "File access is disabled"}
+
         dir_path = Path(path)
         if not _is_path_allowed(dir_path):
             return {"success": False, "error": f"Path not allowed: {path}"}
@@ -141,6 +150,9 @@ def download_file(path: str) -> dict[str, Any]:
         Base64 encoded file content.
     """
     try:
+        if not get_config().features.file_access:
+            return {"success": False, "error": "File access is disabled"}
+
         file_path = Path(path)
         if not _is_path_allowed(file_path):
             return {"success": False, "error": f"Path not allowed: {path}"}

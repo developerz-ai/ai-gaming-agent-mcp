@@ -4,6 +4,7 @@ These tests use mocked tool functions to verify the run_workflow()
 function logic without requiring actual GUI automation.
 """
 
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -438,3 +439,33 @@ def test_integration_workflow_example():
         assert calls[1] == {"text": "echo hello world"}
         assert calls[2] == {"key": "enter"}
         assert calls[3] == {"keys": ["alt", "F4"]}
+
+
+@pytest.mark.parametrize("module,feature,tool,args", [
+    ("screen", "screenshot", "screenshot", {}),
+    ("files", "file_access", "read_file", {"path": "unused"}),
+    ("mouse", "mouse_control", "click", {"x": 1, "y": 2}),
+    ("keyboard", "keyboard_control", "type_text", {"text": "unused", "use_paste": True}),
+])
+def test_disabled_feature_stops_real_dispatch(module, feature, tool, args):
+    from ai_gaming_agent.config import Config
+
+    config = Config.model_construct()
+    setattr(config.features, feature, False)
+    with (
+        patch.object(Config, "load", return_value=config),
+        patch.dict("sys.modules", {"pyautogui": None, "pyperclip": None, "screeninfo": None}),
+        patch("ai_gaming_agent.tools.system.get_system_info") as later,
+    ):
+        tool_module = importlib.reload(importlib.import_module(f"ai_gaming_agent.tools.{module}"))
+        assert _get_tool_handler(tool) is getattr(tool_module, tool)
+        with patch("ai_gaming_agent.tools.files.Path") as path:
+            result = run_workflow([{"tool": tool, "args": args}, {"tool": "get_system_info"}])
+            path.assert_not_called()
+        later.assert_not_called()
+    assert result["success"] is False
+    assert result["completed_steps"] == 0
+    assert result["failed_step"] == 0
+    assert len(result["results"]) == 1
+    assert "disabled" in result["error"].lower()
+    assert result["results"][0]["result"]["error"] == result["error"]
