@@ -27,6 +27,8 @@ DOC_COMMAND_FILES = (
     "docs/integration-testing.md",
     "docs/testing.md",
     ".claude/skills/integration-gui/SKILL.md",
+    "apps/ai-gaming-agent-mcp/examples/README.md",
+    ".claude/agents/http-transport.md",
 )
 
 _CD_CHAIN = re.compile(r"cd\s+\S+\s*&&")
