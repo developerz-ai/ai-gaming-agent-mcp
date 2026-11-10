@@ -31,7 +31,7 @@ The server will be available at `http://localhost:8765`
 In another terminal, run an example script:
 
 ```bash
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword)
 ```
 
 ## Examples
@@ -52,19 +52,19 @@ A complete example that demonstrates the end-to-end workflow:
 
 ```bash
 # Run with default command "echo hello world"
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword)
 
 # Run with custom command
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --command "ls -la"
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --command "ls -la")
 
 # Keep terminal open (don't close after command)
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --keep-open
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword --keep-open)
 
 # Use custom server
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password secret
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password secret)
 
 # Verbose output for debugging
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword -v
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword -v)
 ```
 
 #### Features Demonstrated
@@ -139,7 +139,7 @@ The easiest way to run examples (uses project's dependencies):
 ls apps/ai-gaming-agent-mcp/examples/
 
 # Run terminal demo
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password mypassword)
 ```
 
 ### Using Python Directly
@@ -148,14 +148,13 @@ If you have the dependencies installed globally:
 
 ```bash
 pip install mcp httpx
-cd apps/ai-gaming-agent-mcp && python examples/terminal_demo.py --password mypassword
+(cd apps/ai-gaming-agent-mcp && python examples/terminal_demo.py --password mypassword)
 ```
 
 ### From within the examples directory
 
 ```bash
-cd apps/ai-gaming-agent-mcp/examples
-uv run terminal_demo.py --password mypassword
+(cd apps/ai-gaming-agent-mcp/examples && uv run terminal_demo.py --password mypassword)
 ```
 
 ## Requirements
@@ -243,10 +242,10 @@ gaming-agent init --password newpassword
 **Solution:** Check server URL:
 ```bash
 # For local server
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://localhost:8765 --password mypassword
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://localhost:8765 --password mypassword)
 
 # For remote server
-cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password mypassword
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --url http://192.168.1.100:8765 --password mypassword)
 ```
 
 ### Screenshot Save Failed

@@ -26,4 +26,4 @@ Keep `/health` unauthenticated and all `/mcp` traffic authenticated in `apps/ai-
 Reject requests when `config.server.password` is empty instead of allowing unauthenticated access.
 Preserve the SSE connection and POST message pairing used by `SseServerTransport`.
 Update `apps/ai-gaming-agent-mcp/tests/test_http_server.py` for authentication, health, and session behavior.
-Run `cd apps/ai-gaming-agent-mcp && uv run pytest tests/test_http_server.py -v` after transport changes, then the full unit gate.
+Run `(cd apps/ai-gaming-agent-mcp && uv run pytest tests/test_http_server.py -v)` after transport changes, then the full unit gate.
