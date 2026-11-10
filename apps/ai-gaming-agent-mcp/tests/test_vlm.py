@@ -1,6 +1,7 @@
 """Tests for VLM (Vision Language Model) tools."""
 
 import base64
+import importlib
 from unittest.mock import MagicMock, patch
 
 
@@ -398,3 +399,24 @@ class TestAnalyzeImage:
         assert result["response"] == "A red apple on a table"
         assert result["prompt"] == "What fruit is in the image?"
         assert result["model"] == "qwen2.5-vl:3b"
+
+
+def test_analyze_screen_respects_disabled_screenshot():
+    from ai_gaming_agent.config import Config
+    from ai_gaming_agent.tools import vlm
+
+    config = Config.model_construct()
+    config.vlm.enabled = True
+    config.features.screenshot = False
+    with (
+        patch.object(Config, "load", return_value=config),
+        patch.dict("sys.modules", {"pyautogui": None, "screeninfo": None, "ollama": None}),
+        patch.object(vlm, "_analyze_with_ollama") as analyze,
+    ):
+        importlib.reload(importlib.import_module("ai_gaming_agent.tools.screen"))
+        result = vlm.analyze_screen("What is visible?", monitor=0)
+        analyze.assert_not_called()
+    assert result["success"] is False
+    assert result["error"].startswith("Failed to capture screenshot:")
+    assert "disabled" in result["error"].lower()
+    assert result["prompt"] == "What is visible?"

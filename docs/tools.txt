@@ -1,6 +1,37 @@
 AI GAMING AGENT - MCP Tools Reference
 =======================================
 
+FEATURE SWITCHES
+----------------
+
+The following configuration switches default to true and are checked on each call:
+
+  features.screenshot
+    screenshot, get_screen_size
+  features.file_access
+    read_file, write_file, list_files, upload_file, download_file
+  features.mouse_control
+    click, double_click, move_to, drag_to, scroll, get_mouse_position
+  features.keyboard_control
+    type_text (typing and clipboard paste), press_key (including modifiers), hotkey
+
+When a switch is false, its tools return success=false with a clear disabled error
+before protected operations: screen capture or monitor discovery, target-path
+resolution/validation or filesystem access, pointer control, key input or clipboard
+access. Disabled GUI tools do not import GUI dependencies and work headlessly.
+Configuration loading is not blocked by features.file_access; when enabled, file
+tools still enforce security.allowed_paths.
+
+Workflow steps inherit these guards when each step runs. By default a disabled
+step stops the workflow; continue_on_error retains its normal behavior. There is
+no workflow-wide preflight, so earlier steps may already have run. analyze_screen
+propagates disabled screenshot errors without capture or VLM analysis; analyzing
+an already supplied image does not require screenshots.
+
+These switches control the listed tools, not arbitrary effects of execute_command
+or terminal workflows. They are not a security sandbox; command execution has its
+own feature switch and security settings.
+
 SCREEN TOOLS
 ------------
 

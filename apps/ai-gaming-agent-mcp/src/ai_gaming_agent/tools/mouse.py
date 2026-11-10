@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-import pyautogui
+from ai_gaming_agent.config import get_config
 
-# Disable pyautogui fail-safe for automation
-pyautogui.FAILSAFE = False
+
+def _get_pyautogui() -> Any:
+    """Load the backend only for enabled calls, retaining automation settings."""
+    import pyautogui
+
+    pyautogui.FAILSAFE = False
+    return pyautogui
 
 
 def click(
@@ -26,7 +31,10 @@ def click(
         Success status.
     """
     try:
-        pyautogui.click(x=x, y=y, button=button)
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        _get_pyautogui().click(x=x, y=y, button=button)
         return {"success": True, "x": x, "y": y, "button": button}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -43,7 +51,10 @@ def double_click(x: int, y: int) -> dict[str, Any]:
         Success status.
     """
     try:
-        pyautogui.doubleClick(x=x, y=y)
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        _get_pyautogui().doubleClick(x=x, y=y)
         return {"success": True, "x": x, "y": y}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -61,7 +72,10 @@ def move_to(x: int, y: int, duration: float = 0.0) -> dict[str, Any]:
         Success status.
     """
     try:
-        pyautogui.moveTo(x=x, y=y, duration=duration)
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        _get_pyautogui().moveTo(x=x, y=y, duration=duration)
         return {"success": True, "x": x, "y": y}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -79,7 +93,10 @@ def drag_to(x: int, y: int, duration: float = 0.5) -> dict[str, Any]:
         Success status.
     """
     try:
-        pyautogui.dragTo(x=x, y=y, duration=duration)
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        _get_pyautogui().dragTo(x=x, y=y, duration=duration)
         return {"success": True, "x": x, "y": y}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -97,7 +114,10 @@ def scroll(clicks: int, x: int | None = None, y: int | None = None) -> dict[str,
         Success status.
     """
     try:
-        pyautogui.scroll(clicks, x=x, y=y)
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        _get_pyautogui().scroll(clicks, x=x, y=y)
         return {"success": True, "clicks": clicks}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -110,7 +130,10 @@ def get_mouse_position() -> dict[str, Any]:
         Dict with x and y coordinates.
     """
     try:
-        pos = pyautogui.position()
+        if not get_config().features.mouse_control:
+            return {"success": False, "error": "Mouse control is disabled"}
+
+        pos = _get_pyautogui().position()
         return {"success": True, "x": pos.x, "y": pos.y}
     except Exception as e:
         return {"success": False, "error": str(e)}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import platform
 from typing import Any
 
-import pyautogui
+from ai_gaming_agent.config import get_config
 
 
 def type_text(
@@ -24,6 +24,11 @@ def type_text(
         Success status with method used.
     """
     try:
+        if not get_config().features.keyboard_control:
+            return {"success": False, "error": "Keyboard control is disabled"}
+
+        import pyautogui
+
         if use_paste:
             # Use clipboard-based fast input
             import pyperclip
@@ -69,6 +74,11 @@ def press_key(key: str, modifiers: list[str] | None = None) -> dict[str, Any]:
         Success status.
     """
     try:
+        if not get_config().features.keyboard_control:
+            return {"success": False, "error": "Keyboard control is disabled"}
+
+        import pyautogui
+
         if modifiers:
             # Press with modifiers
             with pyautogui.hold(modifiers):
@@ -90,6 +100,11 @@ def hotkey(keys: list[str]) -> dict[str, Any]:
         Success status.
     """
     try:
+        if not get_config().features.keyboard_control:
+            return {"success": False, "error": "Keyboard control is disabled"}
+
+        import pyautogui
+
         pyautogui.hotkey(*keys)
         return {"success": True, "keys": keys}
     except Exception as e:

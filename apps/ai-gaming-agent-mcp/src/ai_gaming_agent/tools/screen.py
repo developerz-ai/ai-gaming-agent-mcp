@@ -6,8 +6,7 @@ import base64
 import io
 from typing import Any
 
-import pyautogui
-from screeninfo import get_monitors
+from ai_gaming_agent.config import get_config
 
 
 def screenshot(monitor: int | None = None) -> dict[str, Any]:
@@ -20,7 +19,14 @@ def screenshot(monitor: int | None = None) -> dict[str, Any]:
         Dict with base64-encoded PNG image.
     """
     try:
+        if not get_config().features.screenshot:
+            return {"success": False, "error": "Screenshot feature is disabled"}
+
+        import pyautogui
+
         if monitor is not None:
+            from screeninfo import get_monitors
+
             monitors = get_monitors()
             if monitor < 0 or monitor >= len(monitors):
                 return {"success": False, "error": f"Invalid monitor index: {monitor}"}
@@ -54,6 +60,11 @@ def get_screen_size(monitor: int | None = None) -> dict[str, Any]:
         Dict with width and height.
     """
     try:
+        if not get_config().features.screenshot:
+            return {"success": False, "error": "Screenshot feature is disabled"}
+
+        from screeninfo import get_monitors
+
         monitors = get_monitors()
 
         if monitor is not None:
