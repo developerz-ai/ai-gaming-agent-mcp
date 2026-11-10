@@ -1,114 +1,112 @@
 AI GAMING AGENT - Installation Guide
-======================================
+====================================
 
-QUICK INSTALL
--------------
-Windows (PowerShell as Administrator):
-  irm https://your-domain.com/install.ps1 | iex
-
-Linux/Mac (Terminal):
-  curl -fsSL https://your-domain.com/install.sh | bash
+The agent ships as the Python package `ai-gaming-agent` (version 0.2.0).
+It installs one console command: `gaming-agent`.
+There is no installer script; install it with pip.
 
 
 SYSTEM REQUIREMENTS
 -------------------
-  - Python 3.10 or higher
+  - Python 3.12 or higher
   - 4GB RAM minimum (8GB recommended)
   - Network connectivity to Master Claude
-  - Administrator/root privileges for input automation
+  - A graphical desktop session (mouse, keyboard and screenshot tools
+    need a display)
 
 For Local VLM (optional):
   - NVIDIA GPU with 4-8GB VRAM
   - CUDA drivers installed
+  - Ollama (installed via the `vlm` extra, see below)
 
 
-INSTALLATION STEPS
-------------------
-The installer performs these steps automatically:
+INSTALL FROM PYPI
+-----------------
+  1. Create and activate a virtual environment
 
-  1. Verify Python 3.10+ is installed
-     - Downloads Python if missing
+     python -m venv ~/.gaming-agent/venv
+     Windows:   %USERPROFILE%\.gaming-agent\venv\Scripts\activate
+     Linux/Mac: source ~/.gaming-agent/venv/bin/activate
 
-  2. Create virtual environment
-     - Location: ~/.gaming-agent/venv/
+  2. Install the package (dependencies are pulled in automatically)
 
-  3. Install Python dependencies
-     - pyautogui, mcp, pillow, fastapi
-     - uvicorn, screeninfo, psutil
-     - ollama (optional, for local VLM)
+     pip install ai-gaming-agent
 
-  4. Download MCP server script
-     - Location: ~/.gaming-agent/server.py
+  3. Optional: add the local VLM support (Ollama client)
 
-  5. Prompt for configuration
-     - Password/API Key
-     - Port (default: 8765)
-     - Enable local VLM option
-     - VLM model selection
-
-  6. Create system service
-     - Windows: Scheduled task (runs at startup)
-     - Linux: systemd service
-
-  7. Configure firewall
-     - Opens configured port
-
-  8. Generate connection config
-     - Outputs MCP config for Claude Desktop
-
-  9. Start the server
+     pip install "ai-gaming-agent[vlm]"
 
 
-MANUAL INSTALLATION
+INSTALL FROM SOURCE
 -------------------
-If the quick installer fails, follow these steps:
+The application lives in apps/ai-gaming-agent-mcp inside the repository.
 
-  1. Install Python 3.10+
+  1. Clone the repository
 
-  2. Create project directory
-     mkdir ~/.gaming-agent
-     cd ~/.gaming-agent
+     git clone https://github.com/developerz-ai/ai-gaming-agent-mcp.git
+     cd ai-gaming-agent-mcp/apps/ai-gaming-agent-mcp
 
-  3. Create virtual environment
-     python -m venv venv
+  2. Create and activate a virtual environment (as above)
 
-  4. Activate environment
-     Windows: venv\Scripts\activate
-     Linux/Mac: source venv/bin/activate
+  3. Install in editable mode
 
-  5. Install dependencies
-     pip install pyautogui mcp pillow fastapi uvicorn screeninfo psutil
+     pip install -e .
 
-  6. Download server script from repository
+  Extras: `vlm` (Ollama), `dev` (ruff, pytest) and `integration`
+  (pytest, pytesseract), e.g. pip install -e ".[dev]"
 
-  7. Create config.json (see configuration.txt)
 
-  8. Run server
-     python server.py
+CONFIGURATION
+-------------
+Create the config file at ~/.gaming-agent/config.json:
+
+  gaming-agent init --password YOUR_PASSWORD --port 8765
+
+Options: --password, --port, --force (overwrite an existing config).
+Show the current configuration with:
+
+  gaming-agent config
+
+See configuration.txt for every setting. A remote PC must list its own
+host and port in server.allowed_hosts (for example "192.168.1.100:8765"),
+otherwise every /mcp request is refused with HTTP 421.
+
+
+RUNNING THE SERVER
+------------------
+  gaming-agent serve                      HTTP/SSE transport (default)
+  gaming-agent serve --transport stdio    stdio transport for a parent MCP client
+
+Options for serve: --transport {stdio,http}, --host, --port, --password,
+--config (path to a config file).
+
+Check the installed version:
+
+  gaming-agent --version
 
 
 POST-INSTALLATION
 -----------------
-After installation:
-
-  1. Note the generated password
-  2. Copy the MCP config JSON for Claude Desktop
-  3. Verify server is running (check port 8765)
-  4. Test connection from Claude Desktop
+  1. Start the server with `gaming-agent serve`
+  2. Verify it is running (default port 8765):
+       curl http://localhost:8765/health
+     Expected: {"status": "ok", "version": "0.2.0"}
+  3. Point Claude at the MCP endpoint http://PC_IP:8765/mcp and send
+     the password as a Bearer token
 
 
 UNINSTALLATION
 --------------
-Windows:
-  gaming-agent uninstall
+  pip uninstall ai-gaming-agent
 
-Linux:
-  systemctl stop gaming-agent
-  systemctl disable gaming-agent
-  rm -rf ~/.gaming-agent
+To also remove the configuration, delete the ~/.gaming-agent directory.
 
 
 UPDATING
 --------
-Run the installer again or use:
-  gaming-agent update
+From PyPI:
+  pip install --upgrade ai-gaming-agent
+
+From a source checkout:
+  git pull
+  pip install -e .
