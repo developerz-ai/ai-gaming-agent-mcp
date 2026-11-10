@@ -112,6 +112,8 @@ def _get_tool_handler(tool_name: str) -> Any | None:
         "get_system_info": ("ai_gaming_agent.tools.system", "get_system_info"),
         "list_windows": ("ai_gaming_agent.tools.system", "list_windows"),
         "focus_window": ("ai_gaming_agent.tools.system", "focus_window"),
+        # VLM tools
+        "analyze_screen": ("ai_gaming_agent.tools.vlm", "analyze_screen"),
     }
 
     if tool_name not in tool_modules:
