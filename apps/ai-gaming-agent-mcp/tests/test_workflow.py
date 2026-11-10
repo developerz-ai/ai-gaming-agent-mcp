@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai_gaming_agent.tools.workflow import run_workflow
+from ai_gaming_agent.tools.workflow import _get_tool_handler, run_workflow
 
 
 @pytest.fixture
@@ -358,6 +358,31 @@ def test_default_args_empty_dict():
 
         assert result["success"] is True
         assert call_args == [{}]  # Should be called with empty dict
+
+
+def test_get_tool_handler_resolves_analyze_screen():
+    """analyze_screen is dispatchable from workflows and maps to the VLM function."""
+    from ai_gaming_agent.tools import vlm
+
+    handler = _get_tool_handler("analyze_screen")
+
+    assert handler is not None
+    assert handler is vlm.analyze_screen
+
+
+def test_run_workflow_analyze_screen_step():
+    """A workflow analyze_screen step reaches the (mocked) VLM function, not 'Unknown tool'."""
+    vlm_result = {"success": True, "response": "A main menu"}
+
+    with patch("ai_gaming_agent.tools.vlm.analyze_screen", return_value=vlm_result) as mock_vlm:
+        result = run_workflow([{"tool": "analyze_screen", "args": {"prompt": "What is on screen?"}}])
+
+    assert result["success"] is True
+    assert result["completed_steps"] == 1
+    assert result["results"][0]["tool"] == "analyze_screen"
+    assert result["results"][0]["result"] == vlm_result
+    assert "Unknown tool" not in str(result["results"][0].get("error", ""))
+    mock_vlm.assert_called_once_with(prompt="What is on screen?")
 
 
 def test_integration_workflow_example():
