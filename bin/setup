@@ -14,32 +14,36 @@ cd "$(dirname "$0")/.."
 # is at fault, not the code. See .claude/skills/verify-change/SKILL.md.
 EXIT_ENV_UNREACHABLE=75
 
-# Toolchain: mise manages the pinned tool versions when it is available.
-if command -v mise >/dev/null 2>&1; then
-  if ! mise install; then
-    echo "setup: mise install failed; continuing without it (uv installs the project environment)." >&2
-  fi
-fi
-
-# uv ships the project environment; make sure it is reachable even when the
-# shell has not sourced the mise shims yet. The shim directory is listed first
-# because that is where mise installs uv by default.
-if ! command -v uv >/dev/null 2>&1; then
-  for candidate in \
+# [bot] Probe existing executables, not just shim presence. Keep this policy
+# aligned with bin/check; discovery must never install or reconfigure mise.
+select_uv() {
+  local remaining="${PATH:-}:" directory candidate
+  local -a directories=()
+  while [[ "$remaining" == *:* ]]; do
+    directories+=("${remaining%%:*}")
+    remaining="${remaining#*:}"
+  done
+  for directory in "${directories[@]}" \
     "$HOME/.local/share/mise/shims" \
     "$HOME/.local/bin" \
     "$HOME/.cargo/bin" \
     "/usr/local/bin"; do
-    if [ -x "$candidate/uv" ]; then
-      PATH="$candidate:$PATH"
-      export PATH
-      break
+    candidate="${directory:-.}/uv"
+    [[ "$candidate" = /* ]] || candidate="$PWD/$candidate"
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      if "$candidate" --version >/dev/null 2>&1; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+      printf 'setup: ignoring unusable uv: %s (--version failed)\n' "$candidate" >&2
     fi
   done
-fi
+  return 1
+}
 
-if ! command -v uv >/dev/null 2>&1; then
-  echo "setup: uv is not installed. Install it from https://docs.astral.sh/uv/ and re-run ./bin/setup" >&2
+if ! UV_BIN="$(select_uv)"; then
+  echo "setup: no runnable uv found on PATH or in the standard install locations." >&2
+  echo "setup: repair your uv/mise shim or install uv from https://docs.astral.sh/uv/ and re-run ./bin/setup" >&2
   exit "$EXIT_ENV_UNREACHABLE"
 fi
 
@@ -94,7 +98,7 @@ fi
 
 # The project environment is the part setup cannot do without. The app project
 # (pyproject.toml + uv.lock) lives in apps/ai-gaming-agent-mcp: sync from there.
-if ! (cd apps/ai-gaming-agent-mcp && uv sync --extra dev); then
+if ! (cd apps/ai-gaming-agent-mcp && "$UV_BIN" sync --extra dev); then
   echo "setup: could not prepare the project environment (uv sync --extra dev failed)." >&2
   echo "setup: the project environment is unreachable; fix the sync and re-run ./bin/setup." >&2
   exit "$EXIT_ENV_UNREACHABLE"

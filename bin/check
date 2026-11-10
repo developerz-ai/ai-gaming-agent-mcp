@@ -29,33 +29,43 @@ EXIT_ENV_UNREACHABLE=75
 # Everything in this section is about whether the gate CAN run. Nothing here
 # may blame the change, so every failure exits 75.
 
-# uv is the only tool the gate needs: it provides both ruff and pytest via the
-# project environment. mise manages it when available, but the shell may not
-# have sourced the mise shims yet, so look in the plain install paths too.
-if ! command -v uv >/dev/null 2>&1; then
-  for candidate in \
+# [bot] Probe existing executables, not just shim presence. Keep this policy
+# aligned with bin/setup; use the selected path for sync AND grading.
+select_uv() {
+  local remaining="${PATH:-}:" directory candidate
+  local -a directories=()
+  while [[ "$remaining" == *:* ]]; do
+    directories+=("${remaining%%:*}")
+    remaining="${remaining#*:}"
+  done
+  for directory in "${directories[@]}" \
     "$HOME/.local/share/mise/shims" \
     "$HOME/.local/bin" \
     "$HOME/.cargo/bin" \
     "/usr/local/bin"; do
-    if [ -x "$candidate/uv" ]; then
-      PATH="$candidate:$PATH"
-      export PATH
-      break
+    candidate="${directory:-.}/uv"
+    [[ "$candidate" = /* ]] || candidate="$PWD/$candidate"
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      if "$candidate" --version >/dev/null 2>&1; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+      printf 'check: ignoring unusable uv: %s (--version failed)\n' "$candidate" >&2
     fi
   done
-fi
+  return 1
+}
 
-if ! command -v uv >/dev/null 2>&1; then
-  echo "check: uv is not installed, so the gate cannot run." >&2
-  echo "check: install uv (https://docs.astral.sh/uv/) or run ./bin/setup, then re-run." >&2
+if ! UV_BIN="$(select_uv)"; then
+  echo "check: no runnable uv found on PATH or in the standard install locations; the gate cannot run." >&2
+  echo "check: repair your uv/mise shim or install uv (https://docs.astral.sh/uv/), then re-run ./bin/setup." >&2
   exit "$EXIT_ENV_UNREACHABLE"
 fi
 
 # The project environment must exist and be satisfiable before ruff or pytest
 # can run. A dependency that cannot be resolved is an environment problem, so
 # it exits 75 rather than being reported as a red change.
-if ! uv sync --extra dev; then
+if ! "$UV_BIN" sync --extra dev; then
   echo "check: could not prepare the project environment (uv sync --extra dev failed)." >&2
   echo "check: run ./bin/setup and re-run; the change itself was not graded." >&2
   exit "$EXIT_ENV_UNREACHABLE"
@@ -66,13 +76,13 @@ fi
 # The commands are the ones CI runs directly and the pre-commit hook runs here.
 
 echo "check: linting (ruff)…"
-if ! uv run ruff check src tests; then
+if ! "$UV_BIN" run ruff check src tests; then
   echo "check: ruff reported lint errors." >&2
   exit 1
 fi
 
 echo "check: unit tests (pytest, integration excluded)…"
-if ! uv run pytest tests/ --ignore=tests/integration -v; then
+if ! "$UV_BIN" run pytest tests/ --ignore=tests/integration -v; then
   echo "check: the unit test suite failed." >&2
   exit 1
 fi

@@ -15,6 +15,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 APP_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_MEMBER = "apps/ai-gaming-agent-mcp"
@@ -119,7 +121,7 @@ def test_app_metadata_readme_does_not_point_at_a_missing_file():
 
 
 def test_app_sources_and_tests_live_in_the_app_directory():
-    """The app's sources moved into the app directory; nothing is left at the root."""
+    """The app's sources moved; only empty directories and bytecode may remain."""
     app_pyproject = APP_DIR / "pyproject.toml"
     data = _load_toml(app_pyproject)
 
@@ -132,8 +134,62 @@ def test_app_sources_and_tests_live_in_the_app_directory():
 
     assert (APP_DIR / "src" / "ai_gaming_agent").is_dir(), "the importable package must live in the app directory"
     assert (APP_DIR / "tests").is_dir(), "the app test suite must live in the app directory"
-    assert not (REPO_ROOT / "src").exists(), "the app sources must not stay at the repository root"
-    assert not (REPO_ROOT / "tests").exists(), "the app tests must not stay at the repository root"
+    leftovers: list[str] = []
+    for legacy in ("src", "tests"):
+        for path in (REPO_ROOT / legacy).rglob("*"):
+            if path.is_dir():
+                continue
+            if path.parent.name == "__pycache__" and path.suffix in {".pyc", ".pyo"}:
+                continue
+            leftovers.append(path.relative_to(REPO_ROOT).as_posix())
+    assert not leftovers, "substantive files must not stay at the repository root: " + ", ".join(sorted(leftovers))
+
+
+@pytest.mark.parametrize("legacy", ["src", "tests"])
+@pytest.mark.parametrize("leftovers", ["absent", "empty", "cache"])
+def test_layout_allows_generated_leftovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, legacy: str, leftovers: str
+) -> None:
+    """Empty directories and bytecode caches do not undo the app migration."""
+    if leftovers != "absent":
+        cache = tmp_path / legacy / "nested" / "__pycache__"
+        cache.mkdir(parents=True)
+        if leftovers == "cache":
+            for suffix in (".pyc", ".pyo"):
+                (cache / f"old_module.cpython-312{suffix}").write_bytes(b"cached bytecode")
+    monkeypatch.setitem(globals(), "REPO_ROOT", tmp_path)
+
+    test_app_sources_and_tests_live_in_the_app_directory()
+
+
+@pytest.mark.parametrize("legacy", ["src", "tests"])
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "module.py",
+        "nested/test_old.py",
+        "data.txt",
+        "module.pyc",
+        "module.pyo",
+        "__pycache__/hidden.py",
+        "__pycache__/data.txt",
+    ],
+)
+def test_layout_rejects_substantive_leftovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, legacy: str, relative: str
+) -> None:
+    """The migration guard must name every substantive leftover, even in caches."""
+    paths = [Path(legacy) / relative, Path(legacy) / "other.py"]
+    for relative_path in paths:
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("leftover", encoding="utf-8")
+    monkeypatch.setitem(globals(), "REPO_ROOT", tmp_path)
+
+    with pytest.raises(AssertionError) as error:
+        test_app_sources_and_tests_live_in_the_app_directory()
+    for relative_path in paths:
+        assert relative_path.as_posix() in str(error.value)
 
 
 def test_documented_commands_do_not_change_the_callers_working_directory():
