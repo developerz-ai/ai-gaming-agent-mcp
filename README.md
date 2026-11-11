@@ -160,9 +160,22 @@ custom connector* needs a public HTTPS URL and OAuth (or no auth). A LAN
 `http://` URL with a static Bearer header cannot be added there, which is why
 the bridge is used.
 
-These configs follow the Claude Code, Claude Desktop, MCP and `mcp-remote`
-documentation. They have not been run against a live Claude client, so no client
-versions are claimed.
+## Client configuration validation
+
+The documented configurations were exercised against a local server at
+`http://127.0.0.1:8765/mcp` with its configured Bearer token:
+
+- **Claude Code 2.1.306:** `claude mcp add --transport sse ...` reported
+  `Status: ✔ Connected` from `claude mcp get`.
+- **Claude Desktop bridge (`mcp-remote` 0.16.6):** the documented `npx`
+  command with `--transport sse-only`, `--allow-http`, and
+  `Authorization:${AUTH_HEADER}` connected with `SSEClientTransport` and
+  reported `Proxy established successfully between local STDIO and remote
+  SSEClientTransport`.
+
+The second check exercises the exact stdio bridge command that Claude Desktop
+launches from `claude_desktop_config.json`; it does not require a signed-in
+desktop application session.
 
 The MCP endpoints validate the `Host` and `Origin` headers against
 `server.allowed_hosts` / `server.allowed_origins`, which default to loopback

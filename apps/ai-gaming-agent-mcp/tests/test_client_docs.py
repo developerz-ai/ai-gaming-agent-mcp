@@ -71,3 +71,13 @@ def test_desktop_bridge_entry_is_stdio_command(relative: str) -> None:
     for snippet in snippets:
         assert '"command": "npx"' in snippet
         assert '"sse-only"' in snippet
+
+
+def test_readme_records_live_client_configuration_validation() -> None:
+    """Keep live-validation evidence with the documented client configs."""
+    text = _read("README.md")
+    assert "## Client configuration validation" in text
+    assert "Claude Code 2.1.306" in text
+    assert "`mcp-remote` 0.16.6" in text
+    assert "Status: ✔ Connected" in text
+    assert "Proxy established successfully" in text
