@@ -32,6 +32,24 @@ These switches control the listed tools, not arbitrary effects of execute_comman
 or terminal workflows. They are not a security sandbox; command execution has its
 own feature switch and security settings.
 
+GUI INITIALIZATION ERRORS
+-------------------------
+
+Mouse tools, keyboard tools, and screenshot load PyAutoGUI only when enabled.
+Backend initialization failures, including a dependency calling sys.exit during
+import, return success=false with an error instead of stopping the server.
+Other tools can still be called in the same session. Import failures happen before
+mouse, keyboard, screenshot, or clipboard operations. get_screen_size uses
+screeninfo independently and does not require PyAutoGUI.
+
+If the error indicates missing tkinter or _tkinter, enable Tk support for the
+Python interpreter running the agent. On Debian/Ubuntu, install python3-tk:
+  sudo apt install python3-tk
+Ensure the agent's interpreter can import tkinter afterward; a separately built
+Python may need its own Tk support. This remedy is for missing Tk support only:
+display configuration and unrelated dependency errors require their own fixes.
+KeyboardInterrupt and exits raised during GUI operations are not suppressed.
+
 SCREEN TOOLS
 ------------
 

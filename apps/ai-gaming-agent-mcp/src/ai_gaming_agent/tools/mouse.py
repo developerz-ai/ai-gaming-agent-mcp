@@ -5,11 +5,12 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from ai_gaming_agent.config import get_config
+from ai_gaming_agent.tools import _load_pyautogui
 
 
 def _get_pyautogui() -> Any:
     """Load the backend only for enabled calls, retaining automation settings."""
-    import pyautogui
+    pyautogui = _load_pyautogui()
 
     pyautogui.FAILSAFE = False
     return pyautogui

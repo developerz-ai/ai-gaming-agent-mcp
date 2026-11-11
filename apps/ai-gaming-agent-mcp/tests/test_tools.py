@@ -1,8 +1,10 @@
 """Headless tests for tool modules and feature-switch boundaries."""
 
+import asyncio
 import base64
 import builtins
 import importlib
+import json
 import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
@@ -80,6 +82,160 @@ GUI_CASES = [
     ("keyboard", "keyboard_control", "press_key", {"key": "enter", "modifiers": ["ctrl"]}, call.press("enter")),
     ("keyboard", "keyboard_control", "hotkey", {"keys": ["ctrl", "c"]}, call.hotkey("ctrl", "c")),
 ]
+
+
+PYAUTOGUI_CASES = [case for case in GUI_CASES if case[2] != "get_screen_size"]
+
+
+@pytest.fixture
+def missing_tk_backend(tmp_path, monkeypatch):
+    """Simulate pyautogui -> mouseinfo -> missing tkinter without a desktop."""
+    (tmp_path / "pyautogui.py").write_text("import mouseinfo\n")
+    (tmp_path / "mouseinfo.py").write_text(
+        "import sys\ntry:\n    import tkinter\nexcept ImportError:\n    sys.exit(EXIT_CODE)\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    for name in ("pyautogui", "mouseinfo"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+    return tmp_path
+
+
+@pytest.mark.parametrize("exit_code", [1, 0, None])
+@pytest.mark.parametrize("module,feature,name,args,backend_call", PYAUTOGUI_CASES)
+def test_missing_tk_returns_error(module, feature, name, args, backend_call, exit_code, missing_tk_backend):
+    handler = getattr(importlib.import_module(f"ai_gaming_agent.tools.{module}"), name)
+    with (
+        patch.object(builtins, "EXIT_CODE", exit_code, create=True),
+        patch.dict(sys.modules, {"pyperclip": MagicMock()}) as modules,
+    ):
+        result = handler(**args)
+        assert modules["pyperclip"].mock_calls == []
+    assert result["success"] is False
+    for guidance in ("tkinter", "python3-tk", "Debian", "Ubuntu"):
+        assert guidance in result["error"]
+
+
+@pytest.mark.parametrize("missing", ["tkinter", "_tkinter"])
+@pytest.mark.parametrize("module,feature,name,args,backend_call", PYAUTOGUI_CASES)
+def test_tk_import_error_guidance(module, feature, name, args, backend_call, missing):
+    handler = getattr(importlib.import_module(f"ai_gaming_agent.tools.{module}"), name)
+    original_import = builtins.__import__
+
+    def failed_import(name, *args, **kwargs):
+        if name == "pyautogui":
+            raise ImportError(f"No module named '{missing}'", name=missing)
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=failed_import):
+        result = handler(**args)
+    assert result["success"] is False
+    assert "tkinter" in result["error"]
+    assert "python3-tk" in result["error"]
+
+
+@pytest.mark.parametrize("error", [ImportError("unrelated backend dependency", name="Xlib"), KeyError("DISPLAY")])
+def test_unrelated_import_diagnostics_preserved(error):
+    from ai_gaming_agent.tools.mouse import click
+
+    original_import = builtins.__import__
+
+    def failed_import(name, *args, **kwargs):
+        if name == "pyautogui":
+            raise error
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=failed_import):
+        assert click(1, 2) == {"success": False, "error": str(error)}
+
+
+@pytest.mark.parametrize("module,feature,name,args,backend_call", PYAUTOGUI_CASES)
+def test_import_keyboard_interrupt_propagates(module, feature, name, args, backend_call):
+    handler = getattr(importlib.import_module(f"ai_gaming_agent.tools.{module}"), name)
+    original_import = builtins.__import__
+
+    def interrupted_import(name, *args, **kwargs):
+        if name == "pyautogui":
+            raise KeyboardInterrupt
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=interrupted_import), pytest.raises(KeyboardInterrupt):
+        handler(**args)
+
+
+@pytest.mark.parametrize("signal", [SystemExit, KeyboardInterrupt])
+@pytest.mark.parametrize("module,feature,name,args,backend_call", PYAUTOGUI_CASES)
+def test_runtime_signals_propagate(module, feature, name, args, backend_call, signal, backends):
+    handler = getattr(importlib.import_module(f"ai_gaming_agent.tools.{module}"), name)
+    getattr(backends[0], backend_call[0]).side_effect = signal
+    with pytest.raises(signal):
+        handler(**args)
+
+
+def test_screen_size_does_not_import_pyautogui(backends, missing_tk_backend):
+    from ai_gaming_agent.tools.screen import get_screen_size
+
+    assert get_screen_size() == {"success": True, "width": 640, "height": 480, "monitors": 1}
+    assert "pyautogui" not in sys.modules
+
+
+@pytest.mark.parametrize("exit_code", [0, None])
+async def test_stdio_survives_gui_import_exit(exit_code, missing_tk_backend):
+    """Use real stdio dispatch and sequential requests in one bounded child process."""
+    source = missing_tk_backend / "safe.txt"
+    source.write_text("server still alive")
+    startup = (
+        "import asyncio, builtins, sys\n"
+        "from ai_gaming_agent.config import Config\n"
+        "from ai_gaming_agent.server import run_server\n"
+        "Config.load = classmethod(lambda cls: Config.model_construct())\n"
+        "sys.path.insert(0, sys.argv[1])\n"
+        "sys.modules['tkinter'] = None\n"
+        f"builtins.EXIT_CODE = {exit_code!r}\n"
+        "asyncio.run(run_server())\n"
+    )
+    with (missing_tk_backend / "stderr.log").open("wb") as stderr:
+        process = await asyncio.create_subprocess_exec(
+            sys.executable, "-u", "-c", startup, str(missing_tk_backend),
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=stderr,
+        )
+
+        async def send(message: dict) -> None:
+            process.stdin.write((json.dumps({"jsonrpc": "2.0", **message}) + "\n").encode())
+            await asyncio.wait_for(process.stdin.drain(), timeout=10)
+
+        async def request(identifier: int, method: str, params: dict) -> dict:
+            await send({"id": identifier, "method": method, "params": params})
+            line = await asyncio.wait_for(process.stdout.readline(), timeout=10)
+            assert line, "stdio server exited before replying"
+            response = json.loads(line)
+            assert response["id"] == identifier
+            assert "error" not in response
+            return response["result"]
+
+        try:
+            initialized = await request(1, "initialize", {
+                "protocolVersion": "2024-11-05", "capabilities": {},
+                "clientInfo": {"name": "gui-regression[bot]", "version": "1"},
+            })
+            assert initialized["serverInfo"]["name"] == "ai-gaming-agent"
+            await send({"method": "notifications/initialized"})
+            failed = await request(2, "tools/call", {"name": "click", "arguments": {"x": 1, "y": 2}})
+            result = json.loads(failed["content"][0]["text"])
+            assert result["success"] is False
+            assert "tkinter" in result["error"] and "python3-tk" in result["error"]
+            safe = await request(3, "tools/call", {"name": "read_file", "arguments": {"path": str(source)}})
+            assert json.loads(safe["content"][0]["text"]) == {
+                "success": True, "content": "server still alive", "binary": False,
+            }
+            assert process.returncode is None
+        finally:
+            process.stdin.close()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=5)
+            except TimeoutError:
+                process.kill()
+                await asyncio.wait_for(process.wait(), timeout=5)
 
 
 @pytest.mark.parametrize("module,feature,name,args,backend_call", GUI_CASES)

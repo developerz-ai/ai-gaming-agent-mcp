@@ -7,6 +7,7 @@ import io
 from typing import Any
 
 from ai_gaming_agent.config import get_config
+from ai_gaming_agent.tools import _load_pyautogui
 
 
 def screenshot(monitor: int | None = None) -> dict[str, Any]:
@@ -22,7 +23,7 @@ def screenshot(monitor: int | None = None) -> dict[str, Any]:
         if not get_config().features.screenshot:
             return {"success": False, "error": "Screenshot feature is disabled"}
 
-        import pyautogui
+        pyautogui = _load_pyautogui()
 
         if monitor is not None:
             from screeninfo import get_monitors
