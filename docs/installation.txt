@@ -6,39 +6,73 @@ It installs one console command: `gaming-agent`.
 There is no installer script; install it with pip.
 
 
-SYSTEM REQUIREMENTS
--------------------
+PREREQUISITES
+-------------
   - Python 3.12 or higher
   - 4GB RAM minimum (8GB recommended)
   - Network connectivity to Master Claude
-  - A graphical desktop session (mouse, keyboard and screenshot tools
-    need a display)
+  - A logged-in graphical desktop session for automation (on Linux, X11 or
+    a compatible session with DISPLAY set and access to the target desktop).
+    Installation and gaming-agent --help work headlessly; help needs no DISPLAY.
+
+On Debian/Ubuntu (Ubuntu 24.04 supplies Python 3.12):
+
+  sudo apt update
+  sudo apt install -y git ca-certificates python3 python3-venv python3-tk python3-dev build-essential scrot xclip wmctrl
+
+In a root container, omit sudo; it may not be installed. For desktop automation,
+run as the logged-in desktop user, not root. On older distributions, first
+provide Python >=3.12 and matching venv/Tk development packages.
+
+Fedora equivalents: python3 and python3-pip (venv support), python3-tkinter
+for Tk, python3-devel and gcc for native builds; git, ca-certificates, scrot,
+xclip and wmctrl keep their names. On Arch, use python, python-pip and tk,
+with base-devel for builds, plus git, ca-certificates, scrot, xclip and wmctrl.
+These are Linux prerequisites; macOS/Windows need Python >=3.12 with Tk and Git.
 
 For Local VLM (optional):
   - NVIDIA GPU with 4-8GB VRAM
   - CUDA drivers installed
-  - Ollama (installed via the `vlm` extra, see below)
+  - Ollama server installed separately from https://ollama.com and a vision model
+    (the `vlm` extra installs only the Ollama Python client, not the server)
 
 
-INSTALL FROM PYPI
------------------
+INSTALL FROM GIT (RECOMMENDED)
+-----------------------------
+Install directly from the application's subdirectory in the source repository.
+The examples below use a Linux/macOS shell.
+
   1. Create and activate a virtual environment
 
-     python -m venv ~/.gaming-agent/venv
-     Windows:   %USERPROFILE%\.gaming-agent\venv\Scripts\activate
-     Linux/Mac: source ~/.gaming-agent/venv/bin/activate
+     python3 -m venv ~/.gaming-agent/venv
+     source ~/.gaming-agent/venv/bin/activate
+
+     On Windows, create the environment with your Python 3.12+ interpreter
+     and activate %USERPROFILE%\.gaming-agent\venv\Scripts\activate.bat in cmd.exe.
 
   2. Install the package (dependencies are pulled in automatically)
 
-     pip install ai-gaming-agent
+     pip install "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
 
-  3. Optional: add the local VLM support (Ollama client)
+  3. Verify the CLI (no graphical session required)
 
-     pip install "ai-gaming-agent[vlm]"
+     gaming-agent --help
+
+  4. Optional: add the local VLM support (Ollama Python client only)
+
+     pip install "ai-gaming-agent[vlm] @ git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
+
+ALTERNATIVE: ISOLATED RUN WITH UV
+-------------------------------
+If uv is already installed (https://docs.astral.sh/uv/getting-started/installation/),
+uvx creates an isolated environment; it does not persistently install the
+gaming-agent command into your shell. Git and the system prerequisites still apply.
+
+  uvx --from "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp" gaming-agent --help
 
 
-INSTALL FROM SOURCE
--------------------
+EDITABLE SOURCE CHECKOUT (DEVELOPMENT)
+-------------------------------------
 The application lives in apps/ai-gaming-agent-mcp inside the repository.
 
   1. Clone the repository
@@ -52,7 +86,7 @@ The application lives in apps/ai-gaming-agent-mcp inside the repository.
 
      pip install -e .
 
-  Extras: `vlm` (Ollama), `dev` (ruff, pytest) and `integration`
+  Extras: `vlm` (Ollama Python client), `dev` (ruff, pytest) and `integration`
   (pytest, pytesseract), e.g. pip install -e ".[dev]"
 
 
@@ -104,8 +138,9 @@ To also remove the configuration, delete the ~/.gaming-agent directory.
 
 UPDATING
 --------
-From PyPI:
-  pip install --upgrade ai-gaming-agent
+Activate the same virtual environment first, then update from Git:
+  source ~/.gaming-agent/venv/bin/activate
+  pip install --upgrade "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
 
 From a source checkout:
   git pull

@@ -14,6 +14,11 @@ from ai_gaming_agent.config import get_config
 
 logger = logging.getLogger(__name__)
 
+_VLM_INSTALL_COMMAND = (
+    'pip install "ai-gaming-agent[vlm] @ '
+    'git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"'
+)
+
 
 def analyze_screen(
     prompt: str,
@@ -63,7 +68,7 @@ def analyze_screen(
             "success": False,
             "error": (
                 "VLM is not enabled. Set vlm.enabled=true in config. "
-                "Also ensure you have installed the vlm extra: pip install ai-gaming-agent[vlm]"
+                f"Also ensure you have installed the vlm extra: {_VLM_INSTALL_COMMAND}"
             ),
             "prompt": prompt,
         }
@@ -129,7 +134,7 @@ def _analyze_with_ollama(
             "success": False,
             "error": (
                 "Ollama Python client not installed. "
-                "Install with: pip install ai-gaming-agent[vlm] or pip install ollama"
+                f"Install with: {_VLM_INSTALL_COMMAND} or pip install ollama"
             ),
             "prompt": prompt,
             "model": model,
