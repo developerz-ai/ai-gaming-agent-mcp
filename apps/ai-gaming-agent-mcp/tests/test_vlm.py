@@ -4,6 +4,11 @@ import base64
 import importlib
 from unittest.mock import MagicMock, patch
 
+VLM_INSTALL_COMMAND = (
+    'pip install "ai-gaming-agent[vlm] @ '
+    'git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"'
+)
+
 
 class TestAnalyzeScreen:
     """Tests for analyze_screen function."""
@@ -23,6 +28,8 @@ class TestAnalyzeScreen:
         assert result["success"] is False
         assert "VLM is not enabled" in result["error"]
         assert "vlm.enabled=true" in result["error"]
+        assert VLM_INSTALL_COMMAND in result["error"]
+        assert "ai-gaming-agent" not in result["error"].replace(VLM_INSTALL_COMMAND, "")
         assert result["prompt"] == "What do you see?"
 
     @patch("ai_gaming_agent.tools.vlm.get_config")
@@ -186,7 +193,10 @@ class TestAnalyzeWithOllama:
 
         assert result["success"] is False
         assert "Ollama Python client not installed" in result["error"]
-        assert "pip install" in result["error"]
+        assert VLM_INSTALL_COMMAND in result["error"]
+        assert "ai-gaming-agent" not in result["error"].replace(VLM_INSTALL_COMMAND, "")
+        assert result["prompt"] == "Test"
+        assert result["model"] == "qwen2.5-vl:3b"
 
     def test_successful_ollama_analysis(self):
         """Test successful analysis with Ollama."""

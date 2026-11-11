@@ -24,13 +24,52 @@ Master Claude (Orchestrator)
 
 ## Quick Start
 
-### Installation
+### Prerequisites
+
+- **Python >=3.12** and Git. Ubuntu 24.04 supplies Python 3.12; older distributions
+  may need a newer interpreter and matching venv/Tk development packages.
+- For automation, a **logged-in graphical session**: on Linux, X11 or a compatible
+  session with `DISPLAY` set and access to the target desktop. Installation and
+  `gaming-agent --help` work headlessly, without `DISPLAY`.
+
+On Debian/Ubuntu:
 
 ```bash
-pip install ai-gaming-agent
+sudo apt update
+sudo apt install -y git ca-certificates python3 python3-venv python3-tk python3-dev build-essential scrot xclip wmctrl
 ```
 
-Or install from source:
+In a root container, omit `sudo` (it may not be installed). Run desktop automation
+as the logged-in desktop user, not root.
+Fedora equivalents: `python3` and `python3-pip` (venv support), `python3-tkinter`
+for Tk, and `python3-devel`/`gcc` for native builds. Arch uses `python`,
+`python-pip`, `tk`, and `base-devel`. Both also need `git`, `ca-certificates`,
+`scrot`, `xclip`, and `wmctrl`. On macOS/Windows, install Python >=3.12 with Tk and Git.
+
+### Installation
+
+Install directly from Git, targeting the application subdirectory. In a
+Linux/macOS shell, create and activate a virtual environment first:
+
+```bash
+python3 -m venv ~/.gaming-agent/venv
+source ~/.gaming-agent/venv/bin/activate
+pip install "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
+gaming-agent --help
+```
+
+On Windows, create the environment with your Python 3.12+ interpreter and activate
+`%USERPROFILE%\.gaming-agent\venv\Scripts\activate.bat` in cmd.exe before installing.
+
+Alternatively, if [uv is installed](https://docs.astral.sh/uv/getting-started/installation/),
+run in an isolated environment with `uvx`. This does not persistently install
+`gaming-agent` into your shell; Git and the system prerequisites above still apply:
+
+```bash
+uvx --from "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp" gaming-agent --help
+```
+
+For development, use an editable checkout instead (with the virtual environment active):
 
 ```bash
 git clone https://github.com/developerz-ai/ai-gaming-agent-mcp.git
@@ -334,9 +373,10 @@ To use the `analyze_screen` tool with local vision models:
    ollama pull moondream      # Alternative
    ```
 
-3. **Install VLM dependencies**:
+3. **Install the Ollama Python client** in the activated virtual environment.
+   The `vlm` extra does not install the Ollama server from step 1:
    ```bash
-   pip install ai-gaming-agent[vlm]
+   pip install "ai-gaming-agent[vlm] @ git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
    ```
 
 4. **Enable in config** (`~/.gaming-agent/config.json`):

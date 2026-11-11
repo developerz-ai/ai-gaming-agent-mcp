@@ -12,6 +12,7 @@ root - no build, test or CI step notices. These tests make that failure loud.
 """
 
 import re
+import shlex
 import tomllib
 from pathlib import Path
 
@@ -20,6 +21,9 @@ import pytest
 APP_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_MEMBER = "apps/ai-gaming-agent-mcp"
+INSTALL_GUIDES = ("README.md", "docs/installation.txt")
+GIT_REQUIREMENT = "git+https://github.com/developerz-ai/ai-gaming-agent-mcp.git#subdirectory=apps/ai-gaming-agent-mcp"
+VLM_REQUIREMENT = f"ai-gaming-agent[vlm] @ {GIT_REQUIREMENT}"
 
 # Documentation a reader copies commands from. Every `cd ... && ...` in them
 # has to survive being pasted line by line into one shell.
@@ -239,3 +243,79 @@ def test_repository_has_no_placeholder_domain_installer_pipes():
             violations.append(f"{path.relative_to(REPO_ROOT)}:{line}: {match.group(0)}")
 
     assert not violations, "placeholder domains must not be piped into installers: " + "; ".join(violations)
+
+
+def _install_commands(relative: str) -> list[str]:
+    """Extract shell command lines from either fenced Markdown or the plain guide."""
+    text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+    lines = _command_units(text) if relative.endswith(".md") else text.splitlines()
+    return [line.strip() for line in lines if re.match(r"\s*(?:pip\d* |python3 |source |uvx |gaming-agent |sudo )", line)]
+
+
+@pytest.mark.parametrize("relative", INSTALL_GUIDES)
+def test_install_guides_use_git_before_editable_checkout(relative: str) -> None:
+    """The default install and isolated runner must target the monorepo app."""
+    commands = _install_commands(relative)
+    tokens = [shlex.split(command, comments=True) for command in commands]
+    install = tokens.index(["pip", "install", GIT_REQUIREMENT])
+    runner = tokens.index(["uvx", "--from", GIT_REQUIREMENT, "gaming-agent", "--help"])
+    editable = tokens.index(["pip", "install", "-e", "."])
+    assert install < editable and runner < editable
+    for index in (install, runner):
+        assert any(f"{quote}{GIT_REQUIREMENT}{quote}" in commands[index] for quote in ('"', "'"))
+    create = next(i for i, args in enumerate(tokens) if args[:3] == ["python3", "-m", "venv"])
+    venv = tokens[create][3]
+    activate = tokens.index(["source", f"{venv}/bin/activate"])
+    assert create < activate < install
+    assert ["gaming-agent", "--help"] in tokens[install + 1 :]
+
+
+@pytest.mark.parametrize("relative", INSTALL_GUIDES)
+def test_install_guides_quote_git_extra_and_avoid_pypi(relative: str) -> None:
+    """Every active app install, including upgrades and extras, must use source."""
+    commands = _install_commands(relative)
+    tokens = [shlex.split(command, comments=True) for command in commands]
+    extra = tokens.index(["pip", "install", VLM_REQUIREMENT])
+    assert any(f"{quote}{VLM_REQUIREMENT}{quote}" in commands[extra] for quote in ('"', "'"))
+    for args in tokens:
+        if len(args) < 2 or args[0] not in {"pip", "pip3"} or args[1] != "install":
+            continue
+        for arg in args[2:]:
+            if re.match(r"ai[-_]gaming[-_]agent(?:$|\[|[<>=!~])", arg):
+                assert arg == VLM_REQUIREMENT, f"{relative} recommends a bare PyPI requirement: {arg}"
+    if relative == "docs/installation.txt":
+        assert ["pip", "install", "--upgrade", GIT_REQUIREMENT] in tokens
+
+
+@pytest.mark.parametrize("relative", INSTALL_GUIDES)
+def test_install_guides_include_debian_prerequisites(relative: str) -> None:
+    """A clean Debian/Ubuntu host needs Python, Git, TLS and GUI dependencies."""
+    tokens = [shlex.split(command, comments=True) for command in _install_commands(relative)]
+    required = {"git", "ca-certificates", "python3", "python3-venv", "python3-tk", "scrot", "xclip", "wmctrl"}
+    assert any(args[:3] == ["sudo", "apt", "install"] and required <= set(args[3:]) for args in tokens)
+
+
+@pytest.mark.parametrize("relative", INSTALL_GUIDES)
+def test_install_guides_distinguish_headless_help_from_desktop_automation(relative: str) -> None:
+    """Installing and asking for help need no display; automation needs a desktop."""
+    text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+    text = " ".join(text.replace("`", "").replace("*", "").split())
+    assert re.search(r"logged-in graphical (?:desktop )?session", text)
+    assert "X11" in text and "DISPLAY set" in text and "target desktop" in text
+    assert re.search(r"gaming-agent --help work headlessly.*?(?:without|no) DISPLAY", text)
+    assert re.search(r"root container, omit sudo", text)
+    assert "logged-in desktop user, not root" in text
+
+
+@pytest.mark.parametrize("relative", INSTALL_GUIDES)
+def test_install_guides_include_fedora_and_arch_equivalents(relative: str) -> None:
+    """Non-Debian users need matching Python, Tk, venv and build prerequisites."""
+    text = (REPO_ROOT / relative).read_text(encoding="utf-8").replace("`", "")
+    fedora_start = text.index("Fedora equivalents:")
+    arch_start = text.index("Arch", fedora_start)
+    fedora = text[fedora_start:arch_start]
+    arch = text[arch_start:].split("macOS/Windows", 1)[0]
+    for package in ("python3", "python3-pip", "python3-tkinter", "python3-devel", "gcc"):
+        assert re.search(rf"\b{re.escape(package)}\b", fedora), f"{relative}: missing Fedora {package}"
+    for package in ("python", "python-pip", "tk", "base-devel", "git", "ca-certificates", "scrot", "xclip", "wmctrl"):
+        assert re.search(rf"\b{re.escape(package)}\b", arch), f"{relative}: missing Arch {package}"
