@@ -6,6 +6,7 @@ import platform
 from typing import Any
 
 from ai_gaming_agent.config import get_config
+from ai_gaming_agent.tools import _load_pyautogui
 
 
 def type_text(
@@ -27,7 +28,7 @@ def type_text(
         if not get_config().features.keyboard_control:
             return {"success": False, "error": "Keyboard control is disabled"}
 
-        import pyautogui
+        pyautogui = _load_pyautogui()
 
         if use_paste:
             # Use clipboard-based fast input
@@ -77,7 +78,7 @@ def press_key(key: str, modifiers: list[str] | None = None) -> dict[str, Any]:
         if not get_config().features.keyboard_control:
             return {"success": False, "error": "Keyboard control is disabled"}
 
-        import pyautogui
+        pyautogui = _load_pyautogui()
 
         if modifiers:
             # Press with modifiers
@@ -103,7 +104,7 @@ def hotkey(keys: list[str]) -> dict[str, Any]:
         if not get_config().features.keyboard_control:
             return {"success": False, "error": "Keyboard control is disabled"}
 
-        import pyautogui
+        pyautogui = _load_pyautogui()
 
         pyautogui.hotkey(*keys)
         return {"success": True, "keys": keys}

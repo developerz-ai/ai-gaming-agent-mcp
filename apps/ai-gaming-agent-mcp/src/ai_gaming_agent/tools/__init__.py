@@ -14,6 +14,7 @@ Import tools directly from submodules to avoid GUI dependency issues:
 """
 
 import importlib
+from types import ModuleType
 
 __all__ = [
     # Screen
@@ -75,6 +76,27 @@ _MODULE_MAP = {
     # VLM
     "analyze_screen": "vlm",
 }
+
+
+def _load_pyautogui() -> ModuleType:
+    """Load lazily, containing dependency exits only at the import boundary."""
+    tk_guidance = (
+        "Ensure tkinter is available for the Python interpreter running the agent; "
+        "on Debian/Ubuntu, install python3-tk (sudo apt install python3-tk). "
+        "This addresses missing Tk support, not other display or dependency errors."
+    )
+    try:
+        import pyautogui
+    except SystemExit as exc:
+        raise RuntimeError(
+            f"PyAutoGUI initialization exited (SystemExit: {exc.code!r}). "
+            f"A dependency may be missing tkinter. {tk_guidance}"
+        ) from exc
+    except ImportError as exc:
+        if exc.name not in {"tkinter", "_tkinter"}:
+            raise
+        raise RuntimeError(f"PyAutoGUI initialization failed: {exc}. {tk_guidance}") from exc
+    return pyautogui
 
 
 def __getattr__(name: str):
