@@ -448,39 +448,44 @@ Cons:
 
 ## Claude Desktop MCP Configuration
 
-To connect Master Claude to your gaming PCs, add this to Claude Desktop's config:
+The gaming-PC server speaks legacy HTTP+SSE over plain HTTP with a Bearer token.
+Claude Desktop's config only accepts stdio servers, so each PC is reached through
+the `mcp-remote` stdio bridge (needs Node.js for `npx`). Add this to Claude
+Desktop's config:
 
 **Location:**
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Linux: `~/.config/claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "gaming-pc-1": {
-      "transport": "sse",
-      "url": "http://192.168.1.10:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer your-password-here"
-      }
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://192.168.1.10:8765/mcp", "--transport", "sse-only", "--allow-http", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer your-password-here" }
     },
     "gaming-pc-2": {
-      "transport": "sse", 
-      "url": "http://192.168.1.11:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer your-password-here"
-      }
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://192.168.1.11:8765/mcp", "--transport", "sse-only", "--allow-http", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer your-password-here" }
     },
     "gaming-pc-3": {
-      "transport": "sse",
-      "url": "http://192.168.1.12:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer your-password-here"
-      }
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://192.168.1.12:8765/mcp", "--transport", "sse-only", "--allow-http", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer your-password-here" }
     }
   }
 }
+```
+
+Claude Desktop's *Connectors* UI needs a public HTTPS URL and OAuth, so it does
+not fit a LAN `http://` server with a static Bearer header.
+
+Claude Code connects directly, one command per PC:
+
+```
+claude mcp add --transport sse gaming-pc-1 http://192.168.1.10:8765/mcp --header "Authorization: Bearer your-password-here"
 ```
 
 ---

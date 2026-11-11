@@ -91,25 +91,91 @@ gaming-agent serve --transport http --port 8765 --password your-secret-password
 gaming-agent serve --transport stdio
 ```
 
+### Connect from Claude Code
+
+The HTTP server speaks the legacy HTTP+SSE MCP transport (`GET /mcp` opens the
+stream, messages are POSTed to `/mcp/messages`) over plain HTTP with a Bearer
+token. Claude Code connects to it directly. `--transport` must come before the
+server name:
+
+```bash
+claude mcp add --transport sse gaming-pc http://YOUR-PC-IP:8765/mcp --header "Authorization: Bearer your-secret-password"
+```
+
+Check the connection with `claude mcp list`. Add `--scope user` to make the
+server available in every project. Claude Code flags the SSE transport as
+deprecated but still supports it.
+
 ### Connect from Claude Desktop
 
 **For HTTP/SSE Transport:**
 
-Add to your Claude Desktop config (`~/.config/claude/claude_desktop_config.json` on Linux, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Claude Desktop's `claude_desktop_config.json` only accepts stdio servers (a
+`command` with `args`). An entry with `"transport": "sse"` and a `url` is not
+valid there. Reach the HTTP/SSE server through the
+[`mcp-remote`](https://github.com/punkpeye/mcp-remote) stdio bridge, which needs
+Node.js (for `npx`) on the machine running Claude Desktop.
+
+The config file is at:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+This README does not cover Claude Desktop's separate Linux beta. Use Claude Code
+above on Linux.
 
 ```json
 {
   "mcpServers": {
     "gaming-pc": {
-      "transport": "sse",
-      "url": "http://YOUR-PC-IP:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer your-secret-password"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://YOUR-PC-IP:8765/mcp",
+        "--transport",
+        "sse-only",
+        "--allow-http",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer your-secret-password"
       }
     }
   }
 }
 ```
+
+- `--transport sse-only` forces the legacy SSE transport this server speaks.
+- `--allow-http` is required for a plain `http://` URL; use it only on a trusted
+  private network.
+- The token goes in the `AUTH_HEADER` env var and is referenced as
+  `Authorization:${AUTH_HEADER}` (no space after the colon). This avoids a
+  known problem with spaces in `args` on Windows.
+- For several PCs, add one entry per PC with a distinct name and host.
+
+**Custom connectors do not fit.** Claude Desktop's *Settings > Connectors > Add
+custom connector* needs a public HTTPS URL and OAuth (or no auth). A LAN
+`http://` URL with a static Bearer header cannot be added there, which is why
+the bridge is used.
+
+## Client configuration validation
+
+The documented configurations were exercised against a local server at
+`http://127.0.0.1:8765/mcp` with its configured Bearer token:
+
+- **Claude Code 2.1.306:** `claude mcp add --transport sse ...` reported
+  `Status: ✔ Connected` from `claude mcp get`.
+- **Claude Desktop bridge (`mcp-remote` 0.16.6):** the documented `npx`
+  command with `--transport sse-only`, `--allow-http`, and
+  `Authorization:${AUTH_HEADER}` connected with `SSEClientTransport` and
+  reported `Proxy established successfully between local STDIO and remote
+  SSEClientTransport`.
+
+The second check exercises the exact stdio bridge command that Claude Desktop
+launches from `claude_desktop_config.json`; it does not require a signed-in
+desktop application session.
 
 The MCP endpoints validate the `Host` and `Origin` headers against
 `server.allowed_hosts` / `server.allowed_origins`, which default to loopback
