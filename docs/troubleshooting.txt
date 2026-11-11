@@ -23,7 +23,9 @@ Unauthorized (401 Error)
     - Missing Authorization header
     - Password mismatch between client and server
   Solutions:
-    - Verify password in config matches Claude Desktop config
+    - Verify password in config matches the client config (the AUTH_HEADER
+      env in Claude Desktop's mcp-remote entry, or the --header of
+      claude mcp add)
     - Check Authorization header format (Bearer <password>)
     - Regenerate password and update both configs
 
@@ -90,8 +92,12 @@ Authenticated test:
   file exists), then restart the server.
   GET /health is not Host-validated, so it still answers over the network.
 
-From Claude Desktop:
+From Claude Desktop (via the mcp-remote bridge) or Claude Code
+(claude mcp list):
   Try calling screenshot tool - if it returns an image, connection works
+  - A 421 comes from server.allowed_hosts, not from the password
+  - mcp-remote needs Node.js 18+; its logs live under
+    ~/Library/Logs/Claude (macOS) or %APPDATA%\Claude\logs (Windows)
 
 
 VLM ISSUES

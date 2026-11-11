@@ -353,8 +353,13 @@ for inspection, not a replacement configuration file.
 
 ## Claude Desktop Configuration
 
-To connect Claude Desktop to your gaming PC, add this to:
-- **Linux:** `~/.config/claude/claude_desktop_config.json`
+`claude_desktop_config.json` only holds local stdio servers (`command` /
+`args` / `env`). It does not accept `"transport": "sse"` / `url` / `headers`
+entries, and the server here speaks plain-HTTP SSE with a static Bearer token.
+To reach it from Claude Desktop, run the
+[`mcp-remote`](https://github.com/punkpeye/mcp-remote) bridge as a stdio
+server (needs Node.js 18+). Edit:
+
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
@@ -362,22 +367,67 @@ To connect Claude Desktop to your gaming PC, add this to:
 {
   "mcpServers": {
     "gaming-pc-1": {
-      "transport": "sse",
-      "url": "http://192.168.1.100:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer your-password-here"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://YOUR-PC-IP:8765/mcp",
+        "--transport",
+        "sse-only",
+        "--allow-http",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer your-secret-password"
       }
     },
     "gaming-pc-2": {
-      "transport": "sse",
-      "url": "http://192.168.1.101:8765/mcp",
-      "headers": {
-        "Authorization": "Bearer different-password"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://YOUR-OTHER-PC-IP:8765/mcp",
+        "--transport",
+        "sse-only",
+        "--allow-http",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer your-other-secret-password"
       }
     }
   }
 }
 ```
+
+- `--transport sse-only` selects the legacy HTTP+SSE protocol this server
+  speaks.
+- `--allow-http` is required because the server is plain HTTP; use it only on
+  a trusted private network or VPN.
+- The header value goes through `env` (`Authorization:${AUTH_HEADER}`, no
+  space after the colon) to avoid a known argument-splitting bug with spaces
+  in `args` on Windows.
+
+This bridge config follows the mcp-remote and Claude documentation; it has not
+been exercised against a live Claude client, so no client versions are claimed.
+
+Claude Desktop's **Settings > Connectors > Add custom connector** is not an
+alternative here: connectors need a public HTTPS URL with OAuth (or no auth),
+not a LAN `http://` address with a static Bearer header.
+
+## Claude Code
+
+Claude Code connects to the `/mcp` SSE endpoint directly. `--transport` must
+come before the server name:
+
+```bash
+claude mcp add --transport sse gaming-pc-1 http://YOUR-PC-IP:8765/mcp --header "Authorization: Bearer your-secret-password"
+claude mcp list
+```
+
+SSE is flagged as deprecated in the Claude Code docs but is still supported.
 
 Each PC must list its own address in its own `server.allowed_hosts` (and in
 `server.allowed_origins` if the client sends an `Origin` header). A remote PC
