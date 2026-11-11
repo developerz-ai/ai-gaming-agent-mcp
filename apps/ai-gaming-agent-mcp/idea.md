@@ -147,18 +147,6 @@ Each gaming PC runs an MCP server that exposes these tools:
 
 ## Installation & Setup Flow
 
-### One-Line Install (Goal)
-
-**Windows (PowerShell):**
-```powershell
-irm https://your-domain.com/install.ps1 | iex
-```
-
-**Linux/Mac:**
-```bash
-curl -fsSL https://your-domain.com/install.sh | bash
-```
-
 ### What the Installer Does
 
 ```
@@ -676,10 +664,6 @@ curl -H "Authorization: Bearer your-password" http://192.168.1.10:8765/mcp
 ┌─────────────────────────────────────────────────────────────────┐
 │                    QUICK REFERENCE                               │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  INSTALL:                                                        │
-│    Windows: irm https://domain.com/install.ps1 | iex            │
-│    Linux:   curl -fsSL https://domain.com/install.sh | bash     │
 │                                                                  │
 │  CONFIG FILE:  ~/.gaming-agent/config.json                      │
 │                                                                  │

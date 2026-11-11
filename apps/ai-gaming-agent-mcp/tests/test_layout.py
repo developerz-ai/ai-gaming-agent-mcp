@@ -34,6 +34,10 @@ DOC_COMMAND_FILES = (
 )
 
 _CD_CHAIN = re.compile(r"cd\s+\S+\s*&&")
+_PLACEHOLDER_INSTALLER_PIPE = re.compile(
+    r"https?://(?:your-)?domain\.com/[^\s|`'\"]+\s*\|\s*(?:bash|sh|iex)\b",
+    flags=re.IGNORECASE,
+)
 
 
 def _command_units(text: str) -> list[str]:
@@ -217,3 +221,21 @@ def test_documented_commands_do_not_change_the_callers_working_directory():
                 violations.append(f"{relative}: {unit.strip()}")
 
     assert not violations, "documented commands must run in a subshell: " + "; ".join(violations)
+
+
+def test_repository_has_no_placeholder_domain_installer_pipes():
+    """Placeholder domains must not advertise executable one-line installers."""
+    violations: list[str] = []
+
+    for path in REPO_ROOT.rglob("*"):
+        if not path.is_file() or path.suffix in {".pyc", ".pyo"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for match in _PLACEHOLDER_INSTALLER_PIPE.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            violations.append(f"{path.relative_to(REPO_ROOT)}:{line}: {match.group(0)}")
+
+    assert not violations, "placeholder domains must not be piped into installers: " + "; ".join(violations)
