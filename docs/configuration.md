@@ -26,12 +26,35 @@ gaming-agent init --port 9000 --password secret
 gaming-agent init --force --password new-password
 ```
 
+### File Permissions
+
+The password is stored as plaintext in the JSON file, not encrypted. On POSIX
+systems (Linux/macOS), saving configuration creates new config directories with
+mode `0700` (owner-only access) and the config file with mode `0600` (owner-only
+read/write), even with a permissive umask. Saving also tightens an existing
+config file to `0600` before writing and the app-owned default `~/.gaming-agent`
+directory to `0700`. Existing custom parent directories are left unchanged;
+secure those directories yourself.
+
+These mode-bit guarantees do not enforce equivalent Windows ACL protection.
+On Windows, restrict access to the configuration directory and file using
+Windows security settings.
+
 ### Manual Creation
 
-Create the file manually:
+On POSIX systems, create the file with restrictive permissions before writing
+the password. This also tightens an existing directory and file. The subshell
+keeps the restrictive umask local, and `set -e` stops before writing if a
+permission-setting command fails:
 
 ```bash
+(
+set -e
+umask 077
 mkdir -p ~/.gaming-agent
+chmod 700 ~/.gaming-agent
+touch ~/.gaming-agent/config.json
+chmod 600 ~/.gaming-agent/config.json
 cat > ~/.gaming-agent/config.json << 'EOF'
 {
   "server": {
@@ -61,6 +84,7 @@ cat > ~/.gaming-agent/config.json << 'EOF'
   }
 }
 EOF
+)
 ```
 
 ## Configuration Sections
@@ -225,7 +249,22 @@ gaming-agent serve --host 127.0.0.1 --port 9000 --password override-password
 gaming-agent config
 ```
 
-This outputs the current configuration as JSON.
+This outputs valid JSON with every nonempty `server.password` replaced by the
+fixed marker `[REDACTED]`, including one-character passwords. An empty password
+remains `""`, and other settings are unchanged. Displaying configuration does
+not change the loaded settings or rewrite the saved file; masking is only for
+display and does not change the authentication password.
+
+To explicitly reveal the original password in a private terminal:
+
+```bash
+gaming-agent config --show-password
+```
+
+**Warning:** `--show-password` exposes the plaintext password in terminal
+output, scrollback, and any captured logs. Do not use it in shared terminals,
+CI logs, screen recordings, or output you intend to share. Masked output is
+for inspection, not a replacement configuration file.
 
 ## Example Configurations
 

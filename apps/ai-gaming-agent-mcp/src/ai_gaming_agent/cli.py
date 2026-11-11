@@ -75,7 +75,10 @@ def cmd_init(args: argparse.Namespace) -> int:
 def cmd_config(args: argparse.Namespace) -> int:
     """Show current configuration."""
     config = Config.load()
-    print(json.dumps(config.model_dump(), indent=2))
+    display_config = config.model_dump()
+    if not args.show_password and display_config["server"]["password"]:
+        display_config["server"]["password"] = "[REDACTED]"
+    print(json.dumps(display_config, indent=2))
     return 0
 
 
@@ -113,6 +116,11 @@ def main() -> int:
 
     # config command
     config_parser = subparsers.add_parser("config", help="Show current configuration")
+    config_parser.add_argument(
+        "--show-password",
+        action="store_true",
+        help="Reveal the password (WARNING: exposes it in terminal output and logs)",
+    )
     config_parser.set_defaults(func=cmd_config)
 
     args = parser.parse_args()
