@@ -1,6 +1,8 @@
 """Tests for configuration module."""
 
 import json
+import os
+import stat
 import tempfile
 from pathlib import Path
 
@@ -116,6 +118,72 @@ def test_config_save_and_load():
         loaded = Config.load(config_path)
         assert loaded.server.password == "test-password"
         assert loaded.server.port == 9999
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits are not Windows ACLs")
+@pytest.mark.parametrize("use_default_path", [True, False], ids=["default", "custom"])
+def test_config_save_creates_private_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, use_default_path: bool):
+    """New config directories and files are private before any JSON is written."""
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    config_path = (
+        tmp_path / ".gaming-agent" / "config.json"
+        if use_default_path
+        else tmp_path / "custom" / "nested" / "config.json"
+    )
+    config = Config(server=ServerConfig(password="test-password", port=9999))
+    original_dump = json.dump
+
+    def checked_dump(data: dict, stream, **kwargs) -> None:
+        assert stat.S_IMODE(config_path.parent.stat().st_mode) == 0o700
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+        original_dump(data, stream, **kwargs)
+
+    monkeypatch.setattr(json, "dump", checked_dump)
+    previous_umask = os.umask(0)
+    try:
+        config.save(None if use_default_path else config_path)
+    finally:
+        os.umask(previous_umask)
+
+    assert stat.S_IMODE(config_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+    if not use_default_path:
+        assert stat.S_IMODE((tmp_path / "custom").stat().st_mode) == 0o700
+    assert json.loads(config_path.read_text()) == config.model_dump()
+    assert Config.load(None if use_default_path else config_path).server.password == "test-password"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits are not Windows ACLs")
+@pytest.mark.parametrize("use_default_path", [True, False], ids=["default", "custom"])
+def test_config_save_tightens_existing_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, use_default_path: bool):
+    """Tighten loose files before writing, without chmod of unrelated existing parents."""
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    config_dir = tmp_path / (".gaming-agent" if use_default_path else "custom")
+    config_dir.mkdir()
+    config_dir.chmod(0o755)
+    config_path = config_dir / "config.json"
+    config_path.write_text("old contents that must be fully replaced" * 100)
+    config_path.chmod(0o644)
+    config = Config(server=ServerConfig(password="replacement-password", port=9999))
+    original_dump = json.dump
+
+    def checked_dump(data: dict, stream, **kwargs) -> None:
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+        original_dump(data, stream, **kwargs)
+
+    monkeypatch.setattr(json, "dump", checked_dump)
+    previous_umask = os.umask(0)
+    try:
+        config.save(None if use_default_path else config_path)
+    finally:
+        os.umask(previous_umask)
+
+    assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(config_dir.stat().st_mode) == (0o700 if use_default_path else 0o755)
+    assert json.loads(config_path.read_text()) == config.model_dump()
+    loaded = Config.load(None if use_default_path else config_path)
+    assert loaded.server.password == "replacement-password"
+    assert loaded.server.port == 9999
 
 
 def test_config_load_nonexistent():

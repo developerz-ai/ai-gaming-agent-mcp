@@ -228,12 +228,17 @@ gaming-agent serve
 
 **Solution:** Check that you're using the correct password:
 ```bash
-# View current password
+# [bot] Inspect configuration with the password masked
 gaming-agent config
 
-# Update password if needed
-gaming-agent init --password newpassword
+# [bot] Sensitive reveal: only in a private terminal
+gaming-agent config --show-password
 ```
+
+The default command replaces any nonempty password with `[REDACTED]`; it does
+not reveal the password. `--show-password` explicitly prints the plaintext
+password, exposing it in terminal scrollback and captured logs. Never share or
+record this output. Displaying configuration does not change the saved password.
 
 ### Server Not Found
 

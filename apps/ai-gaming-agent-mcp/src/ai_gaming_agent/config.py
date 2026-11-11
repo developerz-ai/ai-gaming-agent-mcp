@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -104,12 +105,24 @@ class Config(BaseSettings):
         return cls()
 
     def save(self, config_path: Path | None = None) -> None:
-        """Save configuration to file."""
+        """Save plaintext JSON with private POSIX modes (not Windows ACL enforcement)."""
+        default_dir = Path.home() / ".gaming-agent"
         if config_path is None:
-            config_path = Path.home() / ".gaming-agent" / "config.json"
+            config_path = default_dir / "config.json"
 
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_path, "w") as f:
+        missing_dirs = []
+        directory = config_path.parent
+        while not directory.exists():
+            missing_dirs.append(directory)
+            directory = directory.parent
+        for directory in reversed(missing_dirs):
+            directory.mkdir(mode=0o700, exist_ok=True)
+        if os.name == "posix" and config_path.parent == default_dir:
+            default_dir.chmod(0o700)
+
+        with open(config_path, "w", opener=lambda path, flags: os.open(path, flags, 0o600)) as f:
+            if os.name == "posix":
+                os.fchmod(f.fileno(), 0o600)
             json.dump(self.model_dump(), f, indent=2)
 
 
