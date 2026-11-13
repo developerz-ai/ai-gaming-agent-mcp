@@ -136,44 +136,23 @@ This installs:
 
 ### GitHub Actions Workflow
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-env:
-  CI: true  # Auto-skips integration tests
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv python install 3.12
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb scrot python3-tk python3-dev
-      - working-directory: apps/ai-gaming-agent-mcp
-        run: uv sync --extra dev
-      - working-directory: apps/ai-gaming-agent-mcp
-        run: uv run ruff check src tests
-      - working-directory: apps/ai-gaming-agent-mcp
-        run: uv run pytest tests/ --ignore=tests/integration -v
-```
+CI is defined in `.github/workflows/ci.yml`, which is the single source of
+truth for what CI runs (pushes and pull requests targeting `main`). This
+section is a pointer, not a second copy of the workflow — the same pattern as
+`bin/check-docs-note.txt` — and if it ever disagrees with the workflow file,
+the workflow file wins.
 
 ### Key Points
 
-1. **Single Python version**: 3.12 (latest stable)
-2. **Package manager**: uv (fast, deterministic)
-3. **Linting**: ruff (fast, comprehensive)
-4. **Integration tests excluded**: `--ignore=tests/integration` (run from `apps/ai-gaming-agent-mcp`)
-5. **CI environment variable**: `CI=true` signals test skipping
+1. **Least privilege**: the workflow declares `permissions: contents: read` at the top level — the `test` job itself sets no permissions key — so CI can read the repository, never write.
+2. **Pinned actions**: both `actions/checkout` and `astral-sh/setup-uv` are pinned to a full commit SHA with the release tag kept in a trailing comment, so updates are deliberate SHA bumps rather than floating version tags.
+3. **CI skip signal**: the workflow sets `CI=true`; integration tests read it and skip themselves.
+4. **Single Python version**: 3.12, installed with `uv python install`.
+5. **Package manager**: uv (fast, deterministic).
+6. **Linting**: ruff (fast, comprehensive).
+7. **Named steps run from `apps/ai-gaming-agent-mcp`**: the three uv commands — `uv sync --extra dev`, `uv run ruff check src tests`, and `uv run pytest tests/ --ignore=tests/integration -v` — each set `working-directory: apps/ai-gaming-agent-mcp`.
+8. **Linux GUI prerequisites**: `xvfb`, `scrot`, `python3-tk`, and `python3-dev` are installed by a separate step that runs at the repository root — it sets no `working-directory`.
+9. **Integration tests stay local only**: a trailing comment in the workflow says so — they need a real display and real GUI input (see above).
 
 ## Writing New Tests
 
