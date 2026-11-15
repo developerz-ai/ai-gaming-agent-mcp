@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-commit gate — established by dz-runner setup mode. Runs `bin/check`,
+# pre-commit gate — owned by this repository's maintainers. Runs `bin/check`,
 # which performs the same lint and unit-test checks as CI, so a commit that
 # would fail CI fails here first.
 # ACTIVATE IT (once, per clone): git config core.hooksPath .githooks

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# one-command dev — established by dz-runner setup mode. One command; adjust as the repo grows.
+# one-command dev — owned by this repository's maintainers. One command; adjust as the repo grows.
 #
 # Starts the HTTP/SSE MCP server in the foreground. It runs until it is stopped
-# (Ctrl-C, SIGTERM, or the platform ending the run) and tears down the server,
+# (Ctrl-C, SIGTERM, or whatever started it ending the run) and tears down the server,
 # the virtual display and its temp files on the way out — bin/dev owns that
 # cleanup, so nothing else has to stop it.
 #

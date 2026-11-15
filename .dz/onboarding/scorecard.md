@@ -2,7 +2,6 @@
 
 > Written by the developerz.ai maintainer agent — established by dz-runner setup mode. Each onboarding run rewrites this file whole; the latest run wins, and the same card is stored on the platform.
 
-- Run: `run_0a54ee114b854648942e8a2ac96f8640`
 - Computed: 2026-11-03T15:59:15.598Z
 - Proof: **proved** — every command ran green at head.
 - Score: 13 of 15 items ok

@@ -6,8 +6,8 @@ allowed-tools: Read, Glob, Grep, Bash, Write
 
 # /planx — plan a piece of work in developerz-ai/ai-gaming-agent-mcp
 
-> Workflow command — established by dz-runner setup mode. Correct it in place;
-> setup never overwrites a command that exists.
+> Workflow command — owned by this repository's maintainers. Correct it in place;
+> a command that exists is never overwritten.
 
 **Plan only.** No implementation, no edits outside the plan directory. A plan that lives
 only in a session's context dies with the session; on disk it is reviewable, correctable,

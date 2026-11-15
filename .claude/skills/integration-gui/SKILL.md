@@ -3,7 +3,7 @@ description: Run real-display GUI and OCR integration tests. Use for pyautogui, 
 applies: [python]
 ---
 
-> House skill — established by dz-runner setup mode from this repo's own evidence, then owned by its maintainers. Correct it in place; setup never overwrites a skill that exists.
+> House skill — owned by this repository's maintainers, and written from this repository's own evidence. Correct it in place; a skill that exists is never overwritten.
 
 1. Install integration prerequisites with `(cd apps/ai-gaming-agent-mcp && uv sync --extra integration)`.
 2. On Linux, install `python3-tk python3-dev scrot` and, for OCR cases, `tesseract-ocr`.
