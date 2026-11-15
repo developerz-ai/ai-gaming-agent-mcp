@@ -6,8 +6,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task
 
 # /feature — idea to merged in developerz-ai/ai-gaming-agent-mcp
 
-> Workflow command — established by dz-runner setup mode. Correct it in place;
-> setup never overwrites a command that exists.
+> Workflow command — owned by this repository's maintainers. Correct it in place;
+> a command that exists is never overwritten.
 
 **Done means MERGED.** A green local gate is not done, and an open pull request is not
 done. Report what you verified, never what you assume happened.

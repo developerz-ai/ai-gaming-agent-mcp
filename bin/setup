@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# one-command setup — established by dz-runner setup mode. One command; adjust as the repo grows.
+# one-command setup — owned by this repository's maintainers. One command; adjust as the repo grows.
 #
 # Setup prepares a fresh checkout: it installs the optional system packages the
 # GUI/OCR tooling needs and syncs the project environment. The system packages
