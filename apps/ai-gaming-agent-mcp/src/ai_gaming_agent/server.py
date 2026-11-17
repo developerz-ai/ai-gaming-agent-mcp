@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from mcp.server import Server
+from mcp.server import Server, ServerRequestContext
 from mcp.server.stdio import stdio_server
-from mcp.types import ImageContent, TextContent, Tool
+from mcp.types import CallToolRequestParams, CallToolResult, ImageContent, ListToolsResult, TextContent, Tool
 
-from ai_gaming_agent import tools
+from ai_gaming_agent import __version__, tools
 from ai_gaming_agent.config import Config
 
 logger = logging.getLogger(__name__)
@@ -407,38 +407,71 @@ TOOL_HANDLERS = {
 }
 
 
-def create_server(config: Config | None = None) -> Server:
-    """Create and configure the MCP server."""
-    server = Server("ai-gaming-agent")
+async def _list_tools(
+    ctx: ServerRequestContext[Any],
+    params: Any,
+) -> ListToolsResult:
+    """Answer ``tools/list`` with the registered tool definitions."""
+    return ListToolsResult(tools=TOOL_DEFINITIONS)
 
-    @server.list_tools()
-    async def list_tools() -> list[Tool]:
-        return TOOL_DEFINITIONS
 
-    @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent | ImageContent]:
-        handler = TOOL_HANDLERS.get(name)
-        if not handler:
-            return [TextContent(type="text", text=f"Unknown tool: {name}")]
+async def _call_tool(
+    ctx: ServerRequestContext[Any],
+    params: CallToolRequestParams,
+) -> CallToolResult:
+    """Dispatch one ``tools/call`` request to its handler.
 
+    A handler that raises becomes a tool result carrying ``is_error``, as mcp 1's
+    ``call_tool`` decorator did. mcp 2 dispatches handlers without that wrapper,
+    so an unsheltered raise would reach the client as a JSON-RPC protocol error
+    instead of the per-call tool failure it is.
+    """
+    name = params.name
+    arguments = params.arguments or {}
+
+    handler = TOOL_HANDLERS.get(name)
+    if not handler:
+        return CallToolResult(content=[TextContent(type="text", text=f"Unknown tool: {name}")], is_error=True)
+
+    try:
         result = handler(**arguments)
+    except Exception as exc:
+        logger.exception("Tool %r raised", name)
+        return CallToolResult(content=[TextContent(type="text", text=str(exc))], is_error=True)
 
-        # Special handling for screenshot - return image
-        if name == "screenshot" and result.get("success") and "image" in result:
-            return [
+    # Special handling for screenshot - return image
+    if name == "screenshot" and result.get("success") and "image" in result:
+        return CallToolResult(
+            content=[
                 ImageContent(
                     type="image",
                     data=result["image"],
                     mimeType="image/png",
                 )
             ]
+        )
 
-        # Return text result
-        import json
+    # Return text result
+    import json
 
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+    return CallToolResult(content=[TextContent(type="text", text=json.dumps(result, indent=2))])
 
-    return server
+
+def create_server(config: Config | None = None) -> Server:
+    """Create and configure the MCP server.
+
+    The version is named explicitly: mcp 1.x substituted the SDK's own package
+    version into ``serverInfo`` for an unversioned server, while mcp 2 passes
+    the constructor's version through unchanged and reports an empty one. A
+    client reads ``serverInfo.version`` to identify this server, so it carries
+    the agent's version.
+    """
+    return Server(
+        "ai-gaming-agent",
+        version=__version__,
+        on_list_tools=_list_tools,
+        on_call_tool=_call_tool,
+    )
 
 
 async def run_server(config: Config | None = None) -> None:

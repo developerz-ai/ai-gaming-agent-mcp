@@ -88,7 +88,7 @@ AI Gaming Agent - Terminal Demo
 ================================================================================
 2024-01-22 10:15:30,123 - __main__ - INFO - Checking server health...
 2024-01-22 10:15:30,234 - __main__ - INFO - Server status: ok
-2024-01-22 10:15:30,234 - __main__ - INFO - Server version: 0.1.0
+2024-01-22 10:15:30,234 - __main__ - INFO - Server version: 0.2.0
 2024-01-22 10:15:30,345 - __main__ - INFO - Connecting to MCP server...
 2024-01-22 10:15:30,456 - __main__ - INFO - Running terminal workflow: echo hello world
 --------------------------------------------------------------------------------
@@ -147,7 +147,7 @@ ls apps/ai-gaming-agent-mcp/examples/
 If you have the dependencies installed globally:
 
 ```bash
-pip install mcp httpx
+pip install "mcp>=2.3.0,<3" httpx
 (cd apps/ai-gaming-agent-mcp && python examples/terminal_demo.py --password mypassword)
 ```
 
@@ -167,7 +167,7 @@ pip install mcp httpx
 
 ### Python Dependencies
 
-- `mcp>=1.30.0,<2` - MCP protocol implementation
+- `mcp>=2.3.0,<3` - MCP protocol implementation
 - `httpx` - Async HTTP client (optional, for this demo)
 
 ### Optional

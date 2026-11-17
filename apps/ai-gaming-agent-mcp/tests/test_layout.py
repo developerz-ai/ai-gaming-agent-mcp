@@ -227,6 +227,16 @@ def test_documented_commands_do_not_change_the_callers_working_directory():
     assert not violations, "documented commands must run in a subshell: " + "; ".join(violations)
 
 
+def test_httpx_optional_dependencies_are_documented() -> None:
+    """Optional dependency guides must list the HTTP client their tests import."""
+    extras = _load_toml(APP_DIR / "pyproject.toml")["project"]["optional-dependencies"]
+    assert "httpx>=0.27.0" in extras["dev"]
+    assert "httpx>=0.27.0" in extras["integration"]
+
+    for relative in ("CLAUDE.md", "docs/testing.md"):
+        assert "`httpx>=0.27.0`" in (REPO_ROOT / relative).read_text(encoding="utf-8")
+
+
 def test_repository_has_no_placeholder_domain_installer_pipes():
     """Placeholder domains must not advertise executable one-line installers."""
     violations: list[str] = []
