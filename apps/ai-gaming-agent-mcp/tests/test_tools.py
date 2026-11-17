@@ -182,6 +182,9 @@ def test_screen_size_does_not_import_pyautogui(backends, missing_tk_backend):
 @pytest.mark.parametrize("exit_code", [0, None])
 async def test_stdio_survives_gui_import_exit(exit_code, missing_tk_backend):
     """Use real stdio dispatch and sequential requests in one bounded child process."""
+    from ai_gaming_agent import __version__ as agent_version
+    from ai_gaming_agent.server import TOOL_DEFINITIONS
+
     source = missing_tk_backend / "safe.txt"
     source.write_text("server still alive")
     startup = (
@@ -219,6 +222,7 @@ async def test_stdio_survives_gui_import_exit(exit_code, missing_tk_backend):
                 "clientInfo": {"name": "gui-regression[bot]", "version": "1"},
             })
             assert initialized["serverInfo"]["name"] == "ai-gaming-agent"
+            assert initialized["serverInfo"]["version"] == agent_version
             await send({"method": "notifications/initialized"})
             failed = await request(2, "tools/call", {"name": "click", "arguments": {"x": 1, "y": 2}})
             result = json.loads(failed["content"][0]["text"])
@@ -228,6 +232,17 @@ async def test_stdio_survives_gui_import_exit(exit_code, missing_tk_backend):
             assert json.loads(safe["content"][0]["text"]) == {
                 "success": True, "content": "server still alive", "binary": False,
             }
+            # A handler that raises must arrive as a per-call tool failure, not a JSON-RPC error.
+            rejected = await request(4, "tools/call", {"name": "get_screen_size", "arguments": {"bogus": 1}})
+            assert rejected["isError"] is True
+            assert "bogus" in rejected["content"][0]["text"]
+            # tools/list must expose every registered definition.
+            listed = await request(5, "tools/list", {})
+            assert [tool["name"] for tool in listed["tools"]] == [tool.name for tool in TOOL_DEFINITIONS]
+            # An unknown tool is a per-call tool failure, not a JSON-RPC error.
+            unknown = await request(6, "tools/call", {"name": "no_such_tool", "arguments": {}})
+            assert unknown["isError"] is True
+            assert unknown["content"][0]["text"] == "Unknown tool: no_such_tool"
             assert process.returncode is None
         finally:
             process.stdin.close()

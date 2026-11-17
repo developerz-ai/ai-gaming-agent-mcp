@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "mcp>=1.30.0,<2",
+    "mcp>=2.3.0,<3",
     "pyautogui>=0.9.54",
     "pillow>=10.0.0",
     "fastapi>=0.115.0",
@@ -44,10 +44,17 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "ruff>=0.8.0",
+    # starlette's TestClient (used by tests/test_http_server.py) imports httpx.
+    # mcp 1.x pulled it in transitively; mcp 2 uses httpx2 instead, so the test
+    # dependency is declared here rather than inherited by accident.
+    "httpx>=0.27.0",
 ]
 integration = [
     "pytest>=8.0.0",
     "pytesseract>=0.3.10",
+    # tests/integration/test_full_workflow.py talks to the HTTP server with httpx;
+    # `uv sync --extra integration` is an exact sync, so it must request httpx itself.
+    "httpx>=0.27.0",
 ]
 
 [project.scripts]

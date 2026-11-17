@@ -51,7 +51,7 @@ Master Claude (Orchestrator)
 |------|----------------|
 | Language | Python >=3.12 |
 | Package/build | uv, Hatchling |
-| MCP | `mcp>=1.30.0,<2` |
+| MCP | `mcp>=2.3.0,<3` |
 | HTTP | FastAPI >=0.115, `uvicorn[standard]` >=0.32 |
 | Automation | PyAutoGUI >=0.9.54, Pillow >=10, pyperclip >=1.8 |
 | Configuration | Pydantic >=2, pydantic-settings >=2 |
@@ -129,7 +129,7 @@ apps/ai-gaming-agent-mcp/
 |---------|---------|
 | `bin/setup` | Install system prerequisites (`xvfb`, `scrot`, `python3-tk`, `python3-dev`, `tesseract-ocr`) and run `uv sync --extra dev`. |
 | `bin/dev` | Run the HTTP server under `xvfb-run` on `127.0.0.1:8765` with the development password. |
-| `bin/check` | **The gate:** `uv run ruff check src tests && uv run pytest tests/ --ignore=tests/integration -v`. |
+| `bin/check` | **The gate:** prepares the environment, then lints and runs the unit suite. The script owns the exact commands and exit codes. |
 | `bin/stop` | Stop the development stack; currently a no-op. |
 
 CLI entry point: `gaming-agent`. Common subcommands are `gaming-agent init --password secret`, `gaming-agent serve` (HTTP by default), `gaming-agent serve --transport stdio`, and `gaming-agent config`.
@@ -151,7 +151,7 @@ gaming-agent serve --transport stdio             # Start stdio server (for paren
 gaming-agent config                              # Show config
 
 # Quick workflow test
-python apps/ai-gaming-agent-mcp/examples/terminal_demo.py                 # Run demo terminal workflow
+(cd apps/ai-gaming-agent-mcp && uv run examples/terminal_demo.py --password secret)  # Run demo terminal workflow
 ```
 
 ## Configuration
@@ -403,7 +403,7 @@ type_text("python train_model.py --epochs 100 --lr 0.001", use_paste=True)
 |-------|---------|-------------|
 | Unit/CI | `uv run pytest tests/ --ignore=tests/integration -v` | No display required. |
 | Integration | `uv run pytest tests/integration -v` | Real or isolated display; OCR cases require Tesseract. |
-| Gate | `bin/check` | Ruff plus the unit suite. |
+| Gate | `bin/check` | Local; the script defines what it runs. |
 
 Integration tests are local-only and skip in CI. Before real-display GUI or OCR work, read `.claude/skills/integration-gui/SKILL.md`.
 
@@ -476,6 +476,7 @@ When working on this project, follow this pattern:
 
 ### 4. Important Notes
 - **HTTP Server:** Default transport is HTTP/SSE (set in `cli.py` `cmd_serve()`)
+- **MCP Server API:** `server.py` registers handlers through the `Server(...)` constructor - `on_list_tools=_list_tools`, `on_call_tool=_call_tool`, each called as `(ctx, params)`. mcp 2 has no `@server.list_tools()` / `@server.call_tool()` decorators, so a new tool is a `TOOL_DEFINITIONS` entry plus a `TOOL_HANDLERS` mapping, never a decorated function
 - **Lazy Imports:** GUI modules (pyautogui, PIL) use lazy imports to avoid breaking CI
 - **VLM Optional:** `analyze_screen` returns error if Ollama not configured
 - **Workflow Engine:** All tools must be callable from `_get_tool_handler()` in `workflow.py`
