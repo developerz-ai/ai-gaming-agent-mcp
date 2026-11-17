@@ -57,8 +57,8 @@ Master Claude (Orchestrator)
 | Configuration | Pydantic >=2, pydantic-settings >=2 |
 | System | screeninfo >=0.8.1, psutil >=6 |
 | VLM (optional) | Ollama >=0.4 via the `vlm` extra |
-| Quality | Ruff >=0.8; pytest >=8 and pytest-asyncio >=0.24 via the `dev` extra |
-| Integration extra | pytest and pytesseract >=0.3.10 |
+| Quality | Ruff >=0.8; pytest >=8, pytest-asyncio >=0.24, and `httpx>=0.27.0` via the `dev` extra |
+| Integration extra | pytest, pytesseract >=0.3.10, and `httpx>=0.27.0` |
 
 Ruff targets Python 3.12, line length 120, and selects `E,F,I,W` (ignoring `E501`). Pytest uses `asyncio_mode = "auto"`, `testpaths = ["tests"]`, and the `integration` marker.
 

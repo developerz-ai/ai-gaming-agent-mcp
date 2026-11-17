@@ -72,6 +72,7 @@ brew install tesseract
 This installs:
 - `pytest` - Test framework
 - `pytesseract` - Python wrapper for tesseract OCR
+- `httpx>=0.27.0` - HTTP client used by the full workflow tests
 
 ## Integration Test Details
 
