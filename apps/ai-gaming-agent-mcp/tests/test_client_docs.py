@@ -1,9 +1,14 @@
-"""Tests that pin the client-connection docs to what the clients accept.
+"""Tests that pin the docs to what the server and the clients actually do.
 
 ``claude_desktop_config.json`` only takes stdio ``command`` entries, so a
 ``"transport": "sse"`` entry there is invalid, and Claude Desktop's Linux beta
 path is deliberately not asserted. Remote access goes through the ``mcp-remote``
 bridge (Desktop) or ``claude mcp add --transport sse`` (Claude Code).
+
+The second pinned doc is ``docs/tools.txt``: it must not advertise MCP resource
+URIs while ``create_server`` registers no resource handler. Each rule is proven
+to fire on a fixture before it is trusted on the tree, so a rule that cannot
+fail cannot pass.
 """
 
 import re
@@ -21,13 +26,33 @@ CLIENT_DOCS = (
 )
 CLAUDE_CODE_AND_BRIDGE_DOCS = ("README.md", "docs/configuration.md")
 
+TOOLS_DOC = "docs/tools.txt"
+SERVER_SOURCE = "apps/ai-gaming-agent-mcp/src/ai_gaming_agent/server.py"
+
 _JSON_FENCE = re.compile(r"```json\n(.*?)```", re.DOTALL)
 _SSE_TRANSPORT_ENTRY = re.compile(r'"transport"\s*:\s*"sse"')
 _LINUX_DESKTOP_PATH = "~/.config/claude/claude_desktop_config.json"
 
+# A scheme URI, e.g. ``screen://current``. Plain web URLs are not resource URIs,
+# so a doc may still show ``http://localhost:8765/health``.
+_SCHEME_URI = re.compile(r"\b([a-z][a-z0-9+.-]*)://", re.IGNORECASE)
+_WEB_SCHEMES = {"http", "https"}
+# The keyword arguments ``create_server`` would carry if it registered a resource handler.
+_RESOURCE_REGISTRATION_MARKERS = ("on_list_resources=", "on_read_resource=")
+
 
 def _read(relative: str) -> str:
     return (REPO_ROOT / relative).read_text(encoding="utf-8")
+
+
+def resource_uris(text: str) -> list[str]:
+    """Scheme URIs in the text that are not plain web URLs."""
+    return sorted({m.group(0) for m in _SCHEME_URI.finditer(text) if m.group(1).lower() not in _WEB_SCHEMES})
+
+
+def registers_resources(server_source: str) -> bool:
+    """Whether the server source registers an MCP resource handler."""
+    return any(marker in server_source for marker in _RESOURCE_REGISTRATION_MARKERS)
 
 
 def _config_snippets(relative: str) -> list[str]:
@@ -71,6 +96,41 @@ def test_desktop_bridge_entry_is_stdio_command(relative: str) -> None:
     for snippet in snippets:
         assert '"command": "npx"' in snippet
         assert '"sse-only"' in snippet
+
+
+# The rules, proven to fire before they are trusted on the tree.
+
+
+def test_resource_uri_rule_fires_and_lets_web_urls_through() -> None:
+    assert resource_uris("  screen://current   - Live screenshot") == ["screen://"]
+    assert resource_uris("  file:///{path}     - File system access") == ["file://"]
+    assert resource_uris("GET http://localhost:8765/health") == []
+    assert resource_uris("no uri here") == []
+
+
+def test_resource_registration_rule_fires() -> None:
+    assert registers_resources("Server(..., on_list_resources=_list_resources)")
+    assert registers_resources("Server(..., on_read_resource=_read_resource)")
+    assert not registers_resources("Server(..., on_list_tools=_list_tools, on_call_tool=_call_tool)")
+    assert not registers_resources("# on_list_resources is not registered")
+    assert not registers_resources('"on_read_resource is not registered"')
+
+
+# The tree.
+
+
+def test_tools_doc_advertises_no_resource_uri_while_none_is_registered() -> None:
+    """``docs/tools.txt`` documents tools only, unless a resource handler exists."""
+    text = _read(TOOLS_DOC)
+    if registers_resources(_read(SERVER_SOURCE)):
+        assert "no MCP resources" not in text, (
+            f"{SERVER_SOURCE} registers a resource handler, but {TOOLS_DOC} still states it registers none"
+        )
+        return
+    assert resource_uris(text) == [], (
+        f"{TOOLS_DOC} advertises a resource URI, but {SERVER_SOURCE} registers no resource handler"
+    )
+    assert "no MCP resources" in text, f"{TOOLS_DOC} must state that the server registers no MCP resources"
 
 
 def test_readme_records_live_client_configuration_validation() -> None:
