@@ -146,17 +146,40 @@ def test_advisory_constraints_are_declared_and_locked() -> None:
         expected = f"{name}>={floor}" + (f",<{ceiling}" if ceiling else "")
         assert expected in constraints, f"missing advisory constraint: {expected}"
 
-    locked = {
-        package["name"]: package["version"]
-        for package in _load_toml(APP_DIR / "uv.lock")["package"]
-        if package["name"] in ADVISORY_CONSTRAINTS
-    }
+    locked: dict[str, list[str]] = {}
+    for package in _load_toml(APP_DIR / "uv.lock")["package"]:
+        if package["name"] in ADVISORY_CONSTRAINTS:
+            locked.setdefault(package["name"], []).append(package["version"])
     for name, (floor, ceiling) in ADVISORY_CONSTRAINTS.items():
-        assert name in locked, f"{name} is missing from uv.lock"
-        version = _version_tuple(locked[name])
-        assert version >= _version_tuple(floor), f"uv.lock pins {name} {locked[name]}, below the {floor} floor"
-        if ceiling:
-            assert version < _version_tuple(ceiling), f"uv.lock pins {name} {locked[name]}, past the {ceiling} ceiling"
+        assert locked.get(name), f"{name} is missing from uv.lock"
+        for locked_version in locked[name]:
+            version = _version_tuple(locked_version)
+            assert version >= _version_tuple(floor), f"uv.lock pins {name} {locked_version}, below the {floor} floor"
+            if ceiling:
+                assert version < _version_tuple(ceiling), (
+                    f"uv.lock pins {name} {locked_version}, past the {ceiling} ceiling"
+                )
+
+
+def test_advisory_constraints_reject_every_matching_lock_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A safe later fork must not hide an advised earlier fork of a package."""
+    load_toml = _load_toml
+    lockfile = load_toml(APP_DIR / "uv.lock")
+
+    def load_toml_with_stale_starlette(path: Path) -> dict:
+        if path == APP_DIR / "uv.lock":
+            return {
+                "package": [
+                    {"name": "starlette", "version": "0.50.0"},
+                    *lockfile["package"],
+                ]
+            }
+        return load_toml(path)
+
+    monkeypatch.setitem(globals(), "_load_toml", load_toml_with_stale_starlette)
+
+    with pytest.raises(AssertionError, match=r"uv\.lock pins starlette 0\.50\.0, below the 0\.51\.0 floor"):
+        test_advisory_constraints_are_declared_and_locked()
 
 
 def test_app_metadata_readme_does_not_point_at_a_missing_file():
