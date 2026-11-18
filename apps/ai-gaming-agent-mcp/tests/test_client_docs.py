@@ -37,8 +37,8 @@ _LINUX_DESKTOP_PATH = "~/.config/claude/claude_desktop_config.json"
 # so a doc may still show ``http://localhost:8765/health``.
 _SCHEME_URI = re.compile(r"\b([a-z][a-z0-9+.-]*)://", re.IGNORECASE)
 _WEB_SCHEMES = {"http", "https"}
-# The markers ``create_server`` would carry if it registered a resource handler.
-_RESOURCE_REGISTRATION_MARKERS = ("on_list_resources", "on_read_resource")
+# The keyword arguments ``create_server`` would carry if it registered a resource handler.
+_RESOURCE_REGISTRATION_MARKERS = ("on_list_resources=", "on_read_resource=")
 
 
 def _read(relative: str) -> str:
@@ -112,6 +112,8 @@ def test_resource_registration_rule_fires() -> None:
     assert registers_resources("Server(..., on_list_resources=_list_resources)")
     assert registers_resources("Server(..., on_read_resource=_read_resource)")
     assert not registers_resources("Server(..., on_list_tools=_list_tools, on_call_tool=_call_tool)")
+    assert not registers_resources("# on_list_resources is not registered")
+    assert not registers_resources('"on_read_resource is not registered"')
 
 
 # The tree.
@@ -119,9 +121,12 @@ def test_resource_registration_rule_fires() -> None:
 
 def test_tools_doc_advertises_no_resource_uri_while_none_is_registered() -> None:
     """``docs/tools.txt`` documents tools only, unless a resource handler exists."""
-    if registers_resources(_read(SERVER_SOURCE)):
-        pytest.skip(f"{SERVER_SOURCE} registers a resource handler, so {TOOLS_DOC} may document resource URIs")
     text = _read(TOOLS_DOC)
+    if registers_resources(_read(SERVER_SOURCE)):
+        assert "no MCP resources" not in text, (
+            f"{SERVER_SOURCE} registers a resource handler, but {TOOLS_DOC} still states it registers none"
+        )
+        return
     assert resource_uris(text) == [], (
         f"{TOOLS_DOC} advertises a resource URI, but {SERVER_SOURCE} registers no resource handler"
     )
