@@ -263,11 +263,14 @@ demo_terminal_workflow
     - Useful for testing and demonstrations
 
 
-EXPOSED RESOURCES
------------------
-Resources can be accessed by URI:
+MCP RESOURCES
+-------------
 
-  screen://current   - Live screenshot (refreshes each access)
-  file:///{path}     - File system access
-  system://info      - System information
-  game://status      - Custom game state (if implemented)
+This server registers no MCP resources. create_server() passes only
+on_list_tools and on_call_tool, so no resource handler is registered and no
+resource URI is served.
+
+Every capability is one of the tools documented above. Screen capture
+(screenshot), file access (read_file, write_file, list_files) and system
+information (get_system_info) are reached by calling those tools, not by
+reading a resource.
