@@ -109,6 +109,79 @@ def test_lockfile_stays_in_the_app_directory():
     assert not (REPO_ROOT / "uv.lock").exists(), "uv hoisted the lockfile to the repository root"
 
 
+# Advisory floors for packages the app pulls in transitively. Each floor pins a
+# version released after a published advisory, so a re-lock must not go below
+# it; the ceilings keep the majors the app is tested against.
+ADVISORY_CONSTRAINTS = {
+    "certifi": ("2026.10.19", None),
+    "python-multipart": ("0.0.31", None),
+    "starlette": ("0.51.0", "1"),
+    "pyjwt": ("2.11.0", "3"),
+    "cryptography": ("46.0.7", "47"),
+}
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Parse a release version into a comparable tuple of ints."""
+    parts = []
+    for chunk in version.split("."):
+        digits = re.match(r"\d+", chunk)
+        assert digits is not None, f"unparsable version: {version}"
+        parts.append(int(digits.group(0)))
+    return tuple(parts)
+
+
+def test_advisory_constraints_are_declared_and_locked() -> None:
+    """The advisory floors must be declared in [tool.uv] and honoured by uv.lock.
+
+    Without this pin, deleting the ``constraint-dependencies`` block or
+    hand-editing ``uv.lock`` back to an advised version leaves the gate green.
+    """
+    constraints = _load_toml(APP_DIR / "pyproject.toml").get("tool", {}).get("uv", {}).get(
+        "constraint-dependencies"
+    )
+    assert constraints, "the app pyproject.toml must declare [tool.uv] constraint-dependencies"
+
+    for name, (floor, ceiling) in ADVISORY_CONSTRAINTS.items():
+        expected = f"{name}>={floor}" + (f",<{ceiling}" if ceiling else "")
+        assert expected in constraints, f"missing advisory constraint: {expected}"
+
+    locked: dict[str, list[str]] = {}
+    for package in _load_toml(APP_DIR / "uv.lock")["package"]:
+        if package["name"] in ADVISORY_CONSTRAINTS:
+            locked.setdefault(package["name"], []).append(package["version"])
+    for name, (floor, ceiling) in ADVISORY_CONSTRAINTS.items():
+        assert locked.get(name), f"{name} is missing from uv.lock"
+        for locked_version in locked[name]:
+            version = _version_tuple(locked_version)
+            assert version >= _version_tuple(floor), f"uv.lock pins {name} {locked_version}, below the {floor} floor"
+            if ceiling:
+                assert version < _version_tuple(ceiling), (
+                    f"uv.lock pins {name} {locked_version}, past the {ceiling} ceiling"
+                )
+
+
+def test_advisory_constraints_reject_every_matching_lock_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A safe later fork must not hide an advised earlier fork of a package."""
+    load_toml = _load_toml
+    lockfile = load_toml(APP_DIR / "uv.lock")
+
+    def load_toml_with_stale_starlette(path: Path) -> dict:
+        if path == APP_DIR / "uv.lock":
+            return {
+                "package": [
+                    {"name": "starlette", "version": "0.50.0"},
+                    *lockfile["package"],
+                ]
+            }
+        return load_toml(path)
+
+    monkeypatch.setitem(globals(), "_load_toml", load_toml_with_stale_starlette)
+
+    with pytest.raises(AssertionError, match=r"uv\.lock pins starlette 0\.50\.0, below the 0\.51\.0 floor"):
+        test_advisory_constraints_are_declared_and_locked()
+
+
 def test_app_metadata_readme_does_not_point_at_a_missing_file():
     """The readme key must not name a file that the move took away."""
     app_pyproject = APP_DIR / "pyproject.toml"

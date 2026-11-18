@@ -74,6 +74,22 @@ packages = ["src/ai_gaming_agent"]
 [tool.uv.workspace]
 members = []
 
+# Advisory floors, not direct dependencies: these packages arrive transitively
+# (certifi via httpx, python-multipart and pyjwt[crypto] via mcp, cryptography
+# via pyjwt[crypto], starlette via fastapi/mcp/sse-starlette). The floors keep
+# uv from locking back onto a version with a published advisory. The upper
+# bounds are applied only to starlette, pyjwt and cryptography, whose next
+# major would need a deliberate change here; certifi and python-multipart are
+# floor-only, so a major bump of either can land without touching this file.
+[tool.uv]
+constraint-dependencies = [
+    "certifi>=2026.10.19",
+    "python-multipart>=0.0.31",
+    "starlette>=0.51.0,<1",
+    "pyjwt>=2.11.0,<3",
+    "cryptography>=46.0.7,<47",
+]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 120
