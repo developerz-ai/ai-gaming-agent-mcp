@@ -115,7 +115,7 @@ def test_lockfile_stays_in_the_app_directory():
 ADVISORY_CONSTRAINTS = {
     "certifi": ("2026.10.19", None),
     "python-multipart": ("0.0.31", None),
-    "starlette": ("0.51.0", "1"),
+    "starlette": ("1.3.1", "2"),
     "pyjwt": ("2.11.0", "3"),
     "cryptography": ("46.0.7", "47"),
 }
@@ -178,7 +178,7 @@ def test_advisory_constraints_reject_every_matching_lock_entry(monkeypatch: pyte
 
     monkeypatch.setitem(globals(), "_load_toml", load_toml_with_stale_starlette)
 
-    with pytest.raises(AssertionError, match=r"uv\.lock pins starlette 0\.50\.0, below the 0\.51\.0 floor"):
+    with pytest.raises(AssertionError, match=r"uv\.lock pins starlette 0\.50\.0, below the 1\.3\.1 floor"):
         test_advisory_constraints_are_declared_and_locked()
 
 
