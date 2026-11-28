@@ -2,9 +2,11 @@
 # one-command check (lint + unit tests) — owned by this repository's maintainers.
 # One command; adjust as the repo grows.
 #
-# This is the repository gate: .githooks/pre-commit and CI (.github/workflows/ci.yml) both run it,
-# so a change that passes here passes CI. Integration tests stay excluded
-# (they need a real display and are local only).
+# This is the LOCAL repository gate: .githooks/pre-commit runs it. CI
+# (.github/workflows/ci.yml) does NOT invoke this script — it runs the same two
+# commands itself as separate steps, so a change that passes here passes CI's
+# lint and unit tests. Integration tests stay excluded from both (they need a
+# real display and are local only).
 #
 # Exit codes follow .claude/skills/verify-change/SKILL.md:
 #   0  the change passes
@@ -71,7 +73,7 @@ fi
 
 # --- grading ---------------------------------------------------------------
 # From here on the gate CAN run, so every failure is the change being red.
-# CI and the pre-commit hook run these same commands through this script.
+# The commands are the ones CI runs directly and the pre-commit hook runs here.
 
 echo "check: linting (ruff)…"
 if ! "$UV_BIN" run ruff check src tests; then
