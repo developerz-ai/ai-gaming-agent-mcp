@@ -38,17 +38,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb scrot python3-tk python3-dev
 
-      - name: Install dependencies
-        working-directory: apps/ai-gaming-agent-mcp
-        run: uv sync --extra dev
-
-      - name: Lint with ruff
-        working-directory: apps/ai-gaming-agent-mcp
-        run: uv run ruff check src tests
-
-      - name: Run unit tests (skip integration)
-        working-directory: apps/ai-gaming-agent-mcp
-        run: uv run pytest tests/ --ignore=tests/integration -v
+      # The same gate a developer runs locally (lint + unit tests); it syncs dependencies itself.
+      - name: bin/check
+        run: bin/check
 
   # Integration tests are LOCAL ONLY - they require a real display
   # Run locally with: cd apps/ai-gaming-agent-mcp && uv run pytest tests/integration -v
