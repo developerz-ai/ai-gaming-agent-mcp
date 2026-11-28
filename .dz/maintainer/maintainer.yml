@@ -80,11 +80,10 @@ triage:
 escalate:
   always: [hostile_tone, direct_mention]
 
-# scout: the platform's daily survey of this repo files only what is already BROKEN
-# (red CI, failing tests, a security advisory, a broken build or link) — never an
-# improvement idea. `full` lets it file ideas too; `off` stops the survey.
+# scout: the survey is off here (idea / undeployed repo, census 2026-11-28: ~14M tokens per survey run).
+# `broken_only` files only what is already broken; `full` also files ideas.
 scout:
-  survey: broken_only
+  survey: "off"  # quoted: YAML 1.1 parsers read a bare off as false
 
 # Proactive checkups, each a scout reading a brief you commit. Off by default: the
 # platform maintains this repo, it does not hunt for improvements. Uncomment the
@@ -106,3 +105,11 @@ scout:
 # false keeps every branch. See /docs/maintainer-yml.
 branches:
   close_inactive_after_days: 60
+
+# devops: advisory watch off (idea / undeployed repo: nothing ships to users). `advisories` turns it on.
+devops:
+  watch: "off"  # quoted: YAML 1.1 parsers read a bare off as false
+
+# care: docs_drift off (census 2026-11-28: 47 tasks, 8 docs-only merges, 33 failed). flaky_tests keeps its default.
+care:
+  docs_drift: "off"
